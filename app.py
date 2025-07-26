@@ -172,14 +172,19 @@ def get_tasks(project_id):
     try:
         connection = get_db_connection()
         cur = connection.cursor(dictionary=True)
-        query = "SELECT t.id, t.content, t.status, t.priority, t.due_date, t.created_at, t.assignee_id, u.name as assignee_name FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id WHERE t.project_id = %s ORDER BY t.created_at DESC"
+        query = "SELECT t.id, t.content, t.status, t.priority, t.due_date, t.created_at, t.assignee_id, u.name as assignee_name, COUNT(c.id) as comment_count FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id LEFT JOIN comments c ON t.id = c.task_id WHERE t.project_id = %s GROUP BY t.id ORDER BY t.created_at DESC"
         cur.execute(query, (project_id,))
         tasks = {task['id']: task for task in cur.fetchall()}
         if tasks:
             task_ids = tuple(tasks.keys())
-            placeholders = ', '.join(['%s'] * len(task_ids))
-            subtask_query = f"SELECT id, content, is_complete, task_id FROM subtasks WHERE task_id IN ({placeholders})"
-            cur.execute(subtask_query, task_ids)
+            if len(task_ids) == 1:
+                subtask_query = "SELECT id, content, is_complete, task_id FROM subtasks WHERE task_id = %s"
+                cur.execute(subtask_query, (task_ids[0],))
+            else:
+                placeholders = ', '.join(['%s'] * len(task_ids))
+                subtask_query = f"SELECT id, content, is_complete, task_id FROM subtasks WHERE task_id IN ({placeholders})"
+                cur.execute(subtask_query, task_ids)
+            
             subtasks = cur.fetchall()
             for task in tasks.values():
                 task['subtasks'] = []
@@ -282,6 +287,49 @@ def delete_task(project_id, task_id):
     finally:
         if connection and connection.is_connected(): connection.close()
 
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/comments', methods=['GET'])
+@login_required
+@project_member_required
+def get_comments(project_id, task_id):
+    connection = None
+    try:
+        connection = get_db_connection()
+        cur = connection.cursor(dictionary=True)
+        query = "SELECT c.id, c.content, DATE_FORMAT(c.created_at, '%%b %%d, %%Y %%H:%%i') as created_at, u.name as author FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = %s ORDER BY c.created_at ASC"
+        cur.execute(query, (task_id,))
+        comments = cur.fetchall()
+        cur.close()
+        return jsonify(comments)
+    except Exception as e:
+        print(f"Error fetching comments: {e}", file=sys.stderr)
+        return jsonify({'error': 'Could not fetch comments'}), 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/comments', methods=['POST'])
+@login_required
+@project_member_required
+def add_comment(project_id, task_id):
+    connection = None
+    try:
+        user_id = session['user_id']
+        data = request.get_json()
+        content = data.get('content')
+        if not content: return jsonify({'error': 'Comment content is required'}), 400
+        connection = get_db_connection()
+        cur = connection.cursor(dictionary=True)
+        cur.execute("INSERT INTO comments (content, task_id, user_id) VALUES (%s, %s, %s)", (content, task_id, user_id))
+        connection.commit()
+        new_comment_id = cur.lastrowid
+        cur.close()
+        new_comment = {'id': new_comment_id, 'content': content, 'author': session.get('user_name'), 'created_at': datetime.now().strftime('%b %d, %Y %H:%M')}
+        return jsonify(new_comment), 201
+    except Exception as e:
+        print(f"Error adding comment: {e}", file=sys.stderr)
+        return jsonify({'error': 'Could not add comment'}), 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
+
 @app.route('/projects/<int:project_id>/subtasks', methods=['POST'])
 @login_required
 @project_member_required
@@ -381,3 +429,5 @@ def logout():
 
 if __name__ == '__main__':
     app.run(debug=True)
+# app.py
+# Ensure you have the necessary imports and configurations set up.

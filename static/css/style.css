@@ -381,3 +381,64 @@ form input[type="email"] {
     font-size: 0.8rem;
     font-weight: bold;
 }
+/* Comment Styles */
+.comment-container {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.comment-list {
+    list-style: none;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.comment-item {
+    padding: 0.75rem;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #777;
+    margin-bottom: 0.25rem;
+}
+
+.comment-author {
+    font-weight: bold;
+}
+
+.comment-content {
+    margin: 0;
+    word-wrap: break-word;
+}
+
+#add-comment-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+#add-comment-form textarea {
+    flex-grow: 1;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 0.5rem;
+    resize: vertical;
+    min-height: 40px;
+}
+
+/* Comment icon on task card */
+.task-meta .comment-info {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}

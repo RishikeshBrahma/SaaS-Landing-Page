@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <!-- Add/Edit Task Modal (THIS WAS MISSING) -->
+    <!-- Add/Edit Task Modal (THIS WAS MISSING/BROKEN) -->
     <div id="task-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
@@ -75,6 +75,14 @@
                 <h4>Checklist</h4>
                 <ul class="subtask-list" id="subtask-list"></ul>
                 <form id="add-subtask-form"><input type="text" id="subtask-content" placeholder="Add a checklist item..."><button type="submit" class="btn btn-secondary">Add</button></form>
+            </div>
+            <div class="comment-container" id="comment-section" style="display: none;">
+                <h4>Activity & Comments</h4>
+                <ul class="comment-list" id="comment-list"></ul>
+                <form id="add-comment-form">
+                    <textarea id="comment-content" placeholder="Write a comment..." required></textarea>
+                    <button type="submit" class="btn btn-secondary">Send</button>
+                </form>
             </div>
         </div>
     </div>

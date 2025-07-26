@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const subtaskList = document.getElementById('subtask-list');
     const addSubtaskForm = document.getElementById('add-subtask-form');
     const subtaskContentInput = document.getElementById('subtask-content');
+    const commentSection = document.getElementById('comment-section');
+    const commentList = document.getElementById('comment-list');
+    const addCommentForm = document.getElementById('add-comment-form');
+    const commentContentInput = document.getElementById('comment-content');
 
     // Manage Modal Elements
     const manageModal = document.getElementById('manage-modal');
@@ -68,6 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
         taskIdInput.value = '';
         modalTitle.textContent = 'Add New Task';
         subtaskSection.style.display = 'none';
+        if(commentSection) commentSection.style.display = 'none';
         populateAssigneeDropdown();
         showModal(taskModal);
     }
@@ -84,6 +89,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         subtaskSection.style.display = 'block';
         renderSubtasks(task.subtasks || []);
+        if(commentSection) {
+            commentSection.style.display = 'block';
+            fetchAndRenderComments(task.id);
+        }
         showModal(taskModal);
     }
     
@@ -135,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Task & Board Logic ---
+    // --- Task, Subtask, & Comment Logic ---
     function createTaskCard(task) {
         const card = document.createElement('li');
         card.className = `task-card priority-${task.priority}`;
@@ -159,6 +168,10 @@ document.addEventListener('DOMContentLoaded', function() {
                  <div class="assignee-info">
                     ${assigneeName ? `<div class="assignee-avatar" title="${assigneeName}">${assigneeInitials}</div>` : ''}
                  </div>
+                 <div class="comment-info">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/><path d="M2.165 15.803l.02.001.023.001A9.841 9.841 0 0 0 8 16c4.078 0 7.39-2.895 7.84-6.57A9.84 9.84 0 0 0 8 3c-4.078 0-7.39 2.895-7.84 6.57a9.817 9.817 0 0 0-.162 1.332c0 .434.03.864.09 1.284l-1.121 3.424a.5.5 0 0 0 .623.623l3.424-1.12a.5.5 0 0 0-.217-.573z"/></svg>
+                    <span>${task.comment_count || 0}</span>
+                </div>
                  <button class="delete-btn">×</button>
             </div>`;
         return card;
@@ -173,6 +186,21 @@ document.addEventListener('DOMContentLoaded', function() {
             li.innerHTML = `<input type="checkbox" ${st.is_complete ? 'checked' : ''}><span>${st.content}</span>`;
             subtaskList.appendChild(li);
         });
+    }
+
+    async function fetchAndRenderComments(taskId) {
+        try {
+            const response = await fetch(`/projects/${project_id}/tasks/${taskId}/comments`);
+            const comments = await response.json();
+            commentList.innerHTML = '';
+            comments.forEach(comment => {
+                const li = document.createElement('li');
+                li.className = 'comment-item';
+                li.innerHTML = `<div class="comment-header"><span class="comment-author">${comment.author}</span><span class="comment-date">${comment.created_at}</span></div><p class="comment-content">${comment.content}</p>`;
+                commentList.appendChild(li);
+            });
+            commentList.scrollTop = commentList.scrollHeight;
+        } catch (error) { console.error("Error fetching comments:", error); }
     }
 
     function renderFilteredTasks() {
@@ -213,6 +241,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) { hideModal(taskModal); fetchAndRenderAll(); } 
             else { alert(`Failed to ${taskId ? 'update' : 'add'} task.`); }
         } catch (error) { console.error('Error:', error); }
+    });
+
+    addCommentForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const taskId = taskIdInput.value;
+        const content = commentContentInput.value.trim();
+        if (!content || !taskId) return;
+        try {
+            const response = await fetch(`/projects/${project_id}/tasks/${taskId}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+            if (response.ok) {
+                commentContentInput.value = '';
+                fetchAndRenderComments(taskId);
+                fetchAndRenderAll();
+            } else { alert('Failed to post comment.'); }
+        } catch (error) { console.error('Error posting comment:', error); }
     });
 
     addSubtaskForm.addEventListener('submit', async function(e) {

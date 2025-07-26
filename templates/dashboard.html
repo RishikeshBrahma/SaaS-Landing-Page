@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kanban Board - Saasfy</title>
+    <title>{{ project.name }} - Saasfy</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar">
-        <a href="/" class="logo">Saasfy</a>
+        <a href="{{ url_for('projects') }}" class="logo">Saasfy</a>
         <ul class="nav-links">
-            <li><a href="{{ url_for('dashboard') }}">My Board</a></li>
+            <li><a href="{{ url_for('projects') }}"> &larr; Back to Boards</a></li>
         </ul>
         <div class="nav-buttons">
             <span class="nav-user-name">Welcome, {{ user_name }}!</span>
@@ -21,20 +21,23 @@
     </nav>
 
     <!-- Main Dashboard Content -->
-    <div class="container" style="padding: 2rem; max-width: 1200px; margin: auto;">
+    <div class="container" style="padding: 2rem; max-width: 1200px; margin: auto;" data-project-id="{{ project_id }}">
         <header class="dashboard-header" style="display:flex; justify-content: space-between; align-items: center;">
             <div>
-                <h1>Your Workflow</h1>
-                <p>Drag and drop tasks to change their status, or click a task to edit.</p>
+                <h1>{{ project.name }}</h1>
+                <p>Drag and drop tasks, or click a task to edit.</p>
             </div>
-            <button id="open-task-modal-btn" class="btn btn-primary">Add New Task</button>
+            <div>
+                <button id="open-manage-modal-btn" class="btn btn-secondary">Manage Board</button>
+                <button id="open-task-modal-btn" class="btn btn-primary">Add New Task</button>
+            </div>
         </header>
 
-        <!-- NEW: Filter and Search Controls -->
+        <!-- Filter and Search Controls -->
         <div class="filter-container">
-            <input type="text" id="search-input" placeholder="Search tasks by content...">
+            <input type="text" id="search-input" placeholder="Search tasks...">
             <div class="filter-buttons">
-                <span>Filter by Priority:</span>
+                <span>Priority:</span>
                 <button class="filter-btn active" data-priority="all">All</button>
                 <button class="filter-btn" data-priority="high">High</button>
                 <button class="filter-btn" data-priority="medium">Medium</button>
@@ -44,22 +47,13 @@
 
         <!-- Kanban Board Structure -->
         <div class="kanban-board">
-            <div class="kanban-column" data-status="todo">
-                <h3>To Do</h3>
-                <ul class="task-cards" id="tasks-todo"></ul>
-            </div>
-            <div class="kanban-column" data-status="inprogress">
-                <h3>In Progress</h3>
-                <ul class="task-cards" id="tasks-inprogress"></ul>
-            </div>
-            <div class="kanban-column" data-status="done">
-                <h3>Done</h3>
-                <ul class="task-cards" id="tasks-done"></ul>
-            </div>
+            <div class="kanban-column" data-status="todo"><h3>To Do</h3><ul class="task-cards" id="tasks-todo"></ul></div>
+            <div class="kanban-column" data-status="inprogress"><h3>In Progress</h3><ul class="task-cards" id="tasks-inprogress"></ul></div>
+            <div class="kanban-column" data-status="done"><h3>Done</h3><ul class="task-cards" id="tasks-done"></ul></div>
         </div>
     </div>
 
-    <!-- Add/Edit Task Modal -->
+    <!-- Add/Edit Task Modal (THIS WAS MISSING) -->
     <div id="task-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
@@ -67,34 +61,38 @@
             <form id="task-form">
                 <input type="hidden" id="task-id">
                 <label for="task-content">Task Description</label>
-                <input type="text" id="task-content" placeholder="What do you need to do?" required>
+                <input type="text" id="task-content" required>
+                <label for="task-assignee">Assign To</label>
+                <select id="task-assignee"><option value="">Unassigned</option></select>
                 <label for="task-due-date">Due Date</label>
-                <input type="date" id="task-due-date" class="form-control">
+                <input type="date" id="task-due-date">
                 <label for="task-priority">Priority</label>
-                <select id="task-priority" class="form-control">
-                    <option value="low">Low</option>
-                    <option value="medium" selected>Medium</option>
-                    <option value="high">High</option>
-                </select>
+                <select id="task-priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
                 <br><br>
                 <button type="submit" class="btn btn-primary">Save Task</button>
             </form>
             <div class="subtask-container" id="subtask-section" style="display: none;">
-                <hr>
                 <h4>Checklist</h4>
                 <ul class="subtask-list" id="subtask-list"></ul>
-                <form id="add-subtask-form">
-                    <input type="text" id="subtask-content" placeholder="Add a checklist item...">
-                    <button type="submit" class="btn btn-secondary">Add</button>
-                </form>
+                <form id="add-subtask-form"><input type="text" id="subtask-content" placeholder="Add a checklist item..."><button type="submit" class="btn btn-secondary">Add</button></form>
             </div>
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <p>&copy; 2025 Saasfy. All rights reserved.</p>
-    </footer>
+    <!-- Manage Board Modal -->
+    <div id="manage-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Manage Board: {{ project.name }}</h2>
+            <h4>Current Members</h4>
+            <ul class="members-list" id="members-list"></ul>
+            <form id="invite-form">
+                <h4>Invite New Member</h4>
+                <input type="email" id="invite-email" placeholder="Enter user's email address" required>
+                <button type="submit" class="btn btn-primary">Send Invite</button>
+            </form>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>

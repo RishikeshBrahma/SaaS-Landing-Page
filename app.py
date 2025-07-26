@@ -12,14 +12,7 @@ bcrypt = Bcrypt(app)
 
 # --- Database Connection Pool ---
 try:
-    db_pool = mysql.connector.pooling.MySQLConnectionPool(
-        pool_name="saas_pool",
-        pool_size=5,
-        host=app.config['MYSQL_HOST'],
-        user=app.config['MYSQL_USER'],
-        password=app.config['MYSQL_PASSWORD'],
-        database=app.config['MYSQL_DB']
-    )
+    db_pool = mysql.connector.pooling.MySQLConnectionPool(pool_name="saas_pool", pool_size=5, host=app.config['MYSQL_HOST'], user=app.config['MYSQL_USER'], password=app.config['MYSQL_PASSWORD'], database=app.config['MYSQL_DB'])
     print("--- Database connection pool created successfully. ---")
 except Exception as e:
     print(f"---!!! FAILED TO CREATE DATABASE CONNECTION POOL: {e} !!!---", file=sys.stderr)
@@ -37,166 +30,271 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def project_member_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        project_id = kwargs.get('project_id')
+        user_id = session.get('user_id')
+        if not all([project_id, user_id]): return redirect(url_for('projects'))
+        connection = get_db_connection()
+        cur = connection.cursor()
+        cur.execute("SELECT project_id FROM project_members WHERE project_id = %s AND user_id = %s", (project_id, user_id))
+        member = cur.fetchone()
+        cur.close()
+        connection.close()
+        if not member: return redirect(url_for('projects'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/')
 def index():
-    if session.get('logged_in'): return redirect(url_for('dashboard'))
+    if session.get('logged_in'): return redirect(url_for('projects'))
     return render_template('index.html')
 
-@app.route('/dashboard')
+@app.route('/projects')
 @login_required
-def dashboard():
-    return render_template('dashboard.html', user_name=session.get('user_name'))
-
-# --- Task Management API ---
-@app.route('/tasks', methods=['GET'])
-@login_required
-def get_tasks():
+def projects():
     connection = None
     try:
         user_id = session['user_id']
         connection = get_db_connection()
         cur = connection.cursor(dictionary=True)
-        
-        cur.execute("SELECT id, content, status, priority, due_date, created_at FROM tasks WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
-        tasks = {task['id']: task for task in cur.fetchall()}
+        query = "SELECT p.id, p.name, u.name as owner_name FROM projects p JOIN project_members pm ON p.id = pm.project_id JOIN users u ON p.owner_id = u.id WHERE pm.user_id = %s"
+        cur.execute(query, (user_id,))
+        user_projects = cur.fetchall()
+        cur.close()
+        return render_template('projects.html', projects=user_projects, user_name=session.get('user_name'))
+    except Exception as e:
+        print(f"Error fetching projects: {e}", file=sys.stderr)
+        return "Error loading projects.", 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
 
+@app.route('/dashboard/<int:project_id>')
+@login_required
+@project_member_required
+def dashboard(project_id):
+    connection = None
+    try:
+        connection = get_db_connection()
+        cur = connection.cursor(dictionary=True)
+        cur.execute("SELECT name FROM projects WHERE id = %s", (project_id,))
+        project = cur.fetchone()
+        cur.close()
+        if not project: return redirect(url_for('projects'))
+        return render_template('dashboard.html', user_name=session.get('user_name'), project=project, project_id=project_id)
+    except Exception as e:
+        print(f"Error fetching project details: {e}", file=sys.stderr)
+        return "Error loading board.", 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
+
+# --- Project & Member Management APIs ---
+@app.route('/projects', methods=['POST'])
+@login_required
+def create_project():
+    connection = None
+    try:
+        user_id = session['user_id']
+        data = request.get_json()
+        name = data.get('name')
+        if not name: return jsonify({'error': 'Project name is required'}), 400
+        connection = get_db_connection()
+        cur = connection.cursor()
+        cur.execute("INSERT INTO projects (name, owner_id) VALUES (%s, %s)", (name, user_id))
+        project_id = cur.lastrowid
+        cur.execute("INSERT INTO project_members (project_id, user_id, role) VALUES (%s, %s, 'owner')", (project_id, user_id))
+        connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'project_id': project_id}), 201
+    except Exception as e:
+        print(f"Error creating project: {e}", file=sys.stderr)
+        return jsonify({'error': 'Could not create project'}), 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
+
+@app.route('/projects/<int:project_id>/members', methods=['GET'])
+@login_required
+@project_member_required
+def get_members(project_id):
+    connection = None
+    try:
+        connection = get_db_connection()
+        cur = connection.cursor(dictionary=True)
+        query = "SELECT u.id as user_id, u.name, u.email, pm.role FROM users u JOIN project_members pm ON u.id = pm.user_id WHERE pm.project_id = %s"
+        cur.execute(query, (project_id,))
+        members = cur.fetchall()
+        cur.close()
+        return jsonify(members)
+    except Exception as e:
+        print(f"Error fetching members: {e}", file=sys.stderr)
+        return jsonify({'error': 'Could not fetch members'}), 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
+
+@app.route('/projects/<int:project_id>/members', methods=['POST'])
+@login_required
+@project_member_required
+def add_member(project_id):
+    connection = None
+    try:
+        owner_id = session['user_id']
+        connection = get_db_connection()
+        cur = connection.cursor(dictionary=True)
+        cur.execute("SELECT owner_id FROM projects WHERE id = %s", (project_id,))
+        project = cur.fetchone()
+        if not project or project['owner_id'] != owner_id:
+            return jsonify({'error': 'Only the board owner can invite members'}), 403
+        data = request.get_json()
+        email_to_invite = data.get('email')
+        if not email_to_invite: return jsonify({'error': 'Email is required'}), 400
+        cur.execute("SELECT id FROM users WHERE email = %s", (email_to_invite,))
+        user_to_invite = cur.fetchone()
+        if not user_to_invite: return jsonify({'error': 'User with that email does not exist'}), 404
+        user_id_to_invite = user_to_invite['id']
+        cur.execute("INSERT INTO project_members (project_id, user_id, role) VALUES (%s, %s, 'member')", (project_id, user_id_to_invite))
+        connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'User invited successfully!'})
+    except Exception as e:
+        if '1062' in str(e): return jsonify({'error': 'This user is already a member of the board'}), 409
+        print(f"Error adding member: {e}", file=sys.stderr)
+        return jsonify({'error': 'Could not add member'}), 500
+    finally:
+        if connection and connection.is_connected(): connection.close()
+
+# --- Task & Subtask APIs ---
+@app.route('/projects/<int:project_id>/tasks', methods=['GET'])
+@login_required
+@project_member_required
+def get_tasks(project_id):
+    connection = None
+    try:
+        connection = get_db_connection()
+        cur = connection.cursor(dictionary=True)
+        query = "SELECT t.id, t.content, t.status, t.priority, t.due_date, t.created_at, t.assignee_id, u.name as assignee_name FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id WHERE t.project_id = %s ORDER BY t.created_at DESC"
+        cur.execute(query, (project_id,))
+        tasks = {task['id']: task for task in cur.fetchall()}
         if tasks:
             task_ids = tuple(tasks.keys())
-            
-            # --- THIS IS THE CORRECTED LOGIC ---
-            # Create a string of placeholders like '%s, %s, %s'
             placeholders = ', '.join(['%s'] * len(task_ids))
-            # Build the full query safely
             subtask_query = f"SELECT id, content, is_complete, task_id FROM subtasks WHERE task_id IN ({placeholders})"
-            
             cur.execute(subtask_query, task_ids)
             subtasks = cur.fetchall()
-            
             for task in tasks.values():
                 task['subtasks'] = []
                 if task.get('due_date'): task['due_date'] = task['due_date'].strftime('%Y-%m-%d')
                 if task.get('created_at'): task['created_at'] = task['created_at'].strftime('%b %d, %Y')
-
             for subtask in subtasks:
-                if subtask['task_id'] in tasks:
-                    tasks[subtask['task_id']]['subtasks'].append(subtask)
-
+                if subtask['task_id'] in tasks: tasks[subtask['task_id']]['subtasks'].append(subtask)
         cur.close()
-
         grouped_tasks = {'todo': [], 'inprogress': [], 'done': []}
-        for task in tasks.values():
-            grouped_tasks[task['status']].append(task)
-            
+        for task in tasks.values(): grouped_tasks[task['status']].append(task)
         return jsonify(grouped_tasks)
     except Exception as e:
-        print(f"Error fetching tasks: {e}", file=sys.stderr)
+        print(f"Error fetching tasks for project {project_id}: {e}", file=sys.stderr)
         return jsonify({'error': 'Could not fetch tasks'}), 500
     finally:
         if connection and connection.is_connected(): connection.close()
 
-@app.route('/tasks', methods=['POST'])
+@app.route('/projects/<int:project_id>/tasks', methods=['POST'])
 @login_required
-def add_task():
+@project_member_required
+def add_task(project_id):
     connection = None
     try:
-        user_id = session['user_id']
         data = request.get_json()
-        content = data.get('content')
-        priority = data.get('priority', 'medium')
-        due_date = data.get('due_date') or None
+        content, priority, due_date, assignee_id = data.get('content'), data.get('priority', 'medium'), data.get('due_date') or None, data.get('assignee_id') or None
         if not content: return jsonify({'error': 'Task content is required'}), 400
-
         connection = get_db_connection()
         cur = connection.cursor()
-        cur.execute("INSERT INTO tasks (content, user_id, priority, due_date) VALUES (%s, %s, %s, %s)", (content, user_id, priority, due_date))
+        cur.execute("INSERT INTO tasks (content, project_id, priority, due_date, assignee_id) VALUES (%s, %s, %s, %s, %s)", (content, project_id, priority, due_date, assignee_id))
         connection.commit()
         new_task_id = cur.lastrowid
         cur.close()
-        
-        return jsonify({'id': new_task_id, 'content': content, 'status': 'todo', 'priority': priority, 'due_date': due_date, 'created_at': datetime.now().strftime('%b %d, %Y'), 'subtasks': []}), 201
+        return jsonify({'status': 'success'}), 201
     except Exception as e:
-        print(f"Error adding task: {e}", file=sys.stderr)
+        print(f"Error adding task to project {project_id}: {e}", file=sys.stderr)
         return jsonify({'error': 'Could not add task'}), 500
     finally:
         if connection and connection.is_connected(): connection.close()
 
-@app.route('/tasks/<int:task_id>', methods=['PUT'])
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>', methods=['PUT'])
 @login_required
-def update_task_details(task_id):
+@project_member_required
+def update_task_details(project_id, task_id):
     connection = None
     try:
-        user_id = session['user_id']
         data = request.get_json()
-        content, priority, due_date = data.get('content'), data.get('priority'), data.get('due_date') or None
+        content, priority, due_date, assignee_id = data.get('content'), data.get('priority'), data.get('due_date') or None, data.get('assignee_id') or None
         if not all([content, priority]): return jsonify({'error': 'Missing required fields'}), 400
-
         connection = get_db_connection()
         cur = connection.cursor()
-        cur.execute("UPDATE tasks SET content = %s, priority = %s, due_date = %s WHERE id = %s AND user_id = %s", (content, priority, due_date, task_id, user_id))
+        cur.execute("UPDATE tasks SET content = %s, priority = %s, due_date = %s, assignee_id = %s WHERE id = %s AND project_id = %s", (content, priority, due_date, assignee_id, task_id, project_id))
         connection.commit()
         cur.close()
-        if cur.rowcount == 0: return jsonify({'error': 'Task not found or not owned by user'}), 404
+        if cur.rowcount == 0: return jsonify({'error': 'Task not found in this project'}), 404
         return jsonify({'success': True})
     except Exception as e:
-        print(f"Error updating task details: {e}", file=sys.stderr)
+        print(f"Error updating task {task_id}: {e}", file=sys.stderr)
         return jsonify({'error': 'Could not update task'}), 500
     finally:
         if connection and connection.is_connected(): connection.close()
 
-@app.route('/tasks/<int:task_id>/status', methods=['PUT'])
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/status', methods=['PUT'])
 @login_required
-def update_task_status(task_id):
+@project_member_required
+def update_task_status(project_id, task_id):
     connection = None
     try:
-        user_id = session['user_id']
         data = request.get_json()
         new_status = data.get('status')
         if new_status not in ['todo', 'inprogress', 'done']: return jsonify({'error': 'Invalid status'}), 400
         connection = get_db_connection()
         cur = connection.cursor()
-        cur.execute("UPDATE tasks SET status = %s WHERE id = %s AND user_id = %s", (new_status, task_id, user_id))
+        cur.execute("UPDATE tasks SET status = %s WHERE id = %s AND project_id = %s", (new_status, task_id, project_id))
         connection.commit()
         cur.close()
-        if cur.rowcount == 0: return jsonify({'error': 'Task not found or not owned by user'}), 404
+        if cur.rowcount == 0: return jsonify({'error': 'Task not found in this project'}), 404
         return jsonify({'success': True})
     except Exception as e:
-        print(f"Error updating task status: {e}", file=sys.stderr)
+        print(f"Error updating task status for task {task_id}: {e}", file=sys.stderr)
         return jsonify({'error': 'Could not update task status'}), 500
     finally:
         if connection and connection.is_connected(): connection.close()
 
-@app.route('/tasks/<int:task_id>', methods=['DELETE'])
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>', methods=['DELETE'])
 @login_required
-def delete_task(task_id):
+@project_member_required
+def delete_task(project_id, task_id):
     connection = None
     try:
-        user_id = session['user_id']
         connection = get_db_connection()
         cur = connection.cursor()
-        cur.execute("DELETE FROM tasks WHERE id = %s AND user_id = %s", (task_id, user_id))
+        cur.execute("DELETE FROM tasks WHERE id = %s AND project_id = %s", (task_id, project_id))
         connection.commit()
         cur.close()
-        if cur.rowcount == 0: return jsonify({'error': 'Task not found or not owned by user'}), 404
+        if cur.rowcount == 0: return jsonify({'error': 'Task not found in this project'}), 404
         return jsonify({'success': True})
     except Exception as e:
-        print(f"Error deleting task: {e}", file=sys.stderr)
+        print(f"Error deleting task {task_id}: {e}", file=sys.stderr)
         return jsonify({'error': 'Could not delete task'}), 500
     finally:
         if connection and connection.is_connected(): connection.close()
 
-@app.route('/subtasks', methods=['POST'])
+@app.route('/projects/<int:project_id>/subtasks', methods=['POST'])
 @login_required
-def add_subtask():
+@project_member_required
+def add_subtask(project_id):
     connection = None
     try:
-        user_id = session['user_id']
         data = request.get_json()
         content, task_id = data.get('content'), data.get('task_id')
         if not all([content, task_id]): return jsonify({'error': 'Content and task ID are required'}), 400
         connection = get_db_connection()
         cur = connection.cursor()
-        cur.execute("SELECT id FROM tasks WHERE id = %s AND user_id = %s", (task_id, user_id))
-        if cur.fetchone() is None: return jsonify({'error': 'Parent task not found'}), 404
+        cur.execute("SELECT id FROM tasks WHERE id = %s AND project_id = %s", (task_id, project_id))
+        if cur.fetchone() is None: return jsonify({'error': 'Parent task not found in this project'}), 404
         cur.execute("INSERT INTO subtasks (content, task_id) VALUES (%s, %s)", (content, task_id))
         connection.commit()
         new_subtask_id = cur.lastrowid
@@ -208,21 +306,21 @@ def add_subtask():
     finally:
         if connection and connection.is_connected(): connection.close()
 
-@app.route('/subtasks/<int:subtask_id>', methods=['PUT'])
+@app.route('/projects/<int:project_id>/subtasks/<int:subtask_id>', methods=['PUT'])
 @login_required
-def update_subtask(subtask_id):
+@project_member_required
+def update_subtask(project_id, subtask_id):
     connection = None
     try:
-        user_id = session['user_id']
         data = request.get_json()
         is_complete = data.get('is_complete')
         connection = get_db_connection()
         cur = connection.cursor()
-        query = "UPDATE subtasks s JOIN tasks t ON s.task_id = t.id SET s.is_complete = %s WHERE s.id = %s AND t.user_id = %s"
-        cur.execute(query, (is_complete, subtask_id, user_id))
+        query = "UPDATE subtasks s JOIN tasks t ON s.task_id = t.id SET s.is_complete = %s WHERE s.id = %s AND t.project_id = %s"
+        cur.execute(query, (is_complete, subtask_id, project_id))
         connection.commit()
         cur.close()
-        if cur.rowcount == 0: return jsonify({'error': 'Subtask not found or not owned by user'}), 404
+        if cur.rowcount == 0: return jsonify({'error': 'Subtask not found in this project'}), 404
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error updating subtask: {e}", file=sys.stderr)
@@ -258,7 +356,6 @@ def login():
     connection = None
     try:
         data = request.get_json()
-        if not data or not data.get('email') or not data.get('password'): return jsonify({'status': 'error', 'message': 'Email and password are required'}), 400
         email, password = data.get('email'), data.get('password')
         connection = get_db_connection()
         cur = connection.cursor(dictionary=True)
@@ -267,7 +364,7 @@ def login():
         cur.close()
         if user and bcrypt.check_password_hash(user['password'], password):
             session['logged_in'], session['user_id'], session['user_name'] = True, user['id'], user['name']
-            return jsonify({'status': 'success', 'message': 'Login successful!', 'redirect_url': url_for('dashboard')})
+            return jsonify({'status': 'success', 'message': 'Login successful!', 'redirect_url': url_for('projects')})
         else:
             return jsonify({'status': 'error', 'message': 'Invalid email or password.'}), 401
     except Exception as e:
@@ -277,6 +374,7 @@ def login():
         if connection and connection.is_connected(): connection.close()
 
 @app.route('/logout')
+@login_required
 def logout():
     session.clear()
     return redirect(url_for('index'))

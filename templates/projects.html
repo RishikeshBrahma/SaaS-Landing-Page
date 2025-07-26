@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Boards - Saasfy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; }
+        .project-card { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-decoration: none; color: #333; transition: transform 0.2s, box-shadow 0.2s; }
+        .project-card:hover { transform: translateY(-5px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .project-card h3 { margin-top: 0; }
+        .add-project-card { border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #999; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/" class="logo">Saasfy</a>
+        <div class="nav-buttons">
+            <span class="nav-user-name">Welcome, {{ user_name }}!</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <!-- Main Projects Content -->
+    <div class="container" style="padding: 2rem; max-width: 1200px; margin: auto;">
+        <header class="dashboard-header">
+            <h1>Your Boards</h1>
+            <p>Select a board to view its tasks or create a new one.</p>
+        </header>
+
+        <div class="project-grid" style="margin-top: 2rem;">
+            <!-- Loop through user's projects -->
+            {% for project in projects %}
+                <a href="{{ url_for('dashboard', project_id=project.id) }}" class="project-card">
+                    <h3>{{ project.name }}</h3>
+                    <p>Owner: {{ project.owner_name }}</p>
+                </a>
+            {% endfor %}
+            <!-- Card to add a new project -->
+            <a href="#" id="open-project-modal-btn" class="project-card add-project-card">
+                + Create New Board
+            </a>
+        </div>
+    </div>
+
+    <!-- Add Project Modal -->
+    <div id="project-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Create a New Board</h2>
+            <form id="project-form">
+                <label for="project-name">Board Name</label>
+                <input type="text" id="project-name" placeholder="e.g., Marketing Campaign" required>
+                <button type="submit" class="btn btn-primary">Create Board</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
+</body>
+</html>

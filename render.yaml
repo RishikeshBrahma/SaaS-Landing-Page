@@ -1,11 +1,10 @@
-# A clean and simple render.yaml for a Flask and MySQL app
+# render.yaml for the web service only
 
 services:
-  # This is the web service for your Python application
   - type: web
     name: saas-project-manager
     env: python
-    pythonVersion: "3.11" # Explicitly setting the Python version
+    pythonVersion: "3.11"
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
@@ -13,7 +12,7 @@ services:
         generateValue: true
       - key: MYSQL_HOST
         fromDatabase:
-          name: saas-mysql-db
+          name: saas-mysql-db # This must exactly match the name you gave your DB
           property: host
       - key: MYSQL_USER
         fromDatabase:
@@ -27,10 +26,3 @@ services:
         fromDatabase:
           name: saas-mysql-db
           property: database
-
-  # This is the managed MySQL database service
-  - type: db
-    name: saas-mysql-db
-    engine: mysql
-    plan: free
-    databaseVersion: "8" # Specifying the database version

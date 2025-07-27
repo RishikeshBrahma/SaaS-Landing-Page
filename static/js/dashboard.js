@@ -1,36 +1,34 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // This will now correctly get the project ID from the HTML body tag
     const projectId = document.body.dataset.projectId;
     let members = [];
 
-    // Check if projectId is valid before making API calls
     if (!projectId || projectId === 'undefined' || projectId === null) {
         console.error("Project ID is not defined. Halting execution.");
-        // You might want to redirect the user or show a more prominent error
-        // For now, we'll stop the script from running further.
         return;
     }
 
-    // Fetch initial data
     fetchTasks();
     fetchMembers();
 
-    // Make columns sortable
-    // This requires the Sortable.js library to be loaded in the HTML
+    // --- FIX: Initialize Sortable on each column individually ---
     if (typeof Sortable !== 'undefined') {
         const columns = document.querySelectorAll('.task-column');
-        new Sortable(columns, {
-            group: 'tasks',
-            animation: 150,
-            onEnd: function(evt) {
-                const taskId = evt.item.dataset.taskId;
-                const newStatus = evt.to.id.replace('-tasks', '');
-                updateTaskStatus(taskId, newStatus);
-            }
+        // Loop through each column and make it sortable
+        columns.forEach(column => {
+            new Sortable(column, {
+                group: 'tasks',
+                animation: 150,
+                onEnd: function(evt) {
+                    const taskId = evt.item.dataset.taskId;
+                    const newStatus = evt.to.id.replace('-tasks', '');
+                    updateTaskStatus(taskId, newStatus);
+                }
+            });
         });
     } else {
         console.error("Sortable.js is not loaded. Drag-and-drop will not work.");
     }
+    // --- END FIX ---
 
 
     // --- Event Listeners for Modals ---
@@ -39,7 +37,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeButtons = document.querySelectorAll('.close-button');
     const manageMembersBtn = document.getElementById('manage-members-btn');
     const membersModal = document.getElementById('members-modal');
-    const taskDetailsModal = document.getElementById('task-details-modal');
 
     if(addTaskBtn) addTaskBtn.onclick = () => addTaskModal.style.display = 'block';
     if(manageMembersBtn) manageMembersBtn.onclick = () => membersModal.style.display = 'block';
@@ -59,8 +56,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Form Submissions ---
     document.getElementById('add-task-form').addEventListener('submit', addTask);
     document.getElementById('add-member-form').addEventListener('submit', addMember);
-    // Note: The original file had listeners for forms that don't exist in the final HTML.
-    // I've removed them to prevent errors. We will add the delete listener dynamically.
 
     // --- Core Functions ---
     function fetchTasks() {
@@ -92,7 +87,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderTasks(tasksByStatus) {
-        // Clear existing tasks to prevent duplication
         document.getElementById('todo-tasks').innerHTML = '';
         document.getElementById('inprogress-tasks').innerHTML = '';
         document.getElementById('done-tasks').innerHTML = '';
@@ -119,8 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
             </div>
         `;
-        // When a card is clicked, open the details modal
-        card.addEventListener('click', () => openTaskDetails(task.id));
+        card.addEventListener('click', () => openTaskDetails(task));
         return card;
     }
 
@@ -139,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 document.getElementById('add-task-modal').style.display = 'none';
                 document.getElementById('add-task-form').reset();
-                fetchTasks(); // Refresh tasks after adding a new one
+                fetchTasks();
             } else {
                 alert("Failed to add task.");
             }
@@ -171,14 +164,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function openTaskDetails(taskId) {
-        // In a real app, you'd fetch the full task details here to populate the modal.
-        // For now, we'll just add the delete functionality.
+    function openTaskDetails(task) {
         const modal = document.getElementById('task-details-modal');
         const deleteBtn = document.getElementById('delete-task-btn');
         
-        // This makes sure the delete button knows which task to delete.
-        deleteBtn.onclick = () => deleteTask(taskId);
+        deleteBtn.onclick = () => deleteTask(task.id);
         
         modal.style.display = 'block';
     }
@@ -186,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Member Management ---
     function renderMembers(members) {
         const memberList = document.getElementById('member-list');
-        memberList.innerHTML = ''; // Clear list
+        memberList.innerHTML = '';
         members.forEach(member => {
             const li = document.createElement('li');
             li.textContent = `${escapeHTML(member.name)} (${escapeHTML(member.email)}) - ${member.role}`;
@@ -206,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.status === 'success') {
                 document.getElementById('add-member-form').reset();
-                fetchMembers(); // Refresh member list
+                fetchMembers();
             } else {
                 alert(`Error: ${data.error}`);
             }
@@ -216,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateAssigneeDropdowns() {
         const dropdowns = document.querySelectorAll('.assignee-dropdown');
         dropdowns.forEach(dropdown => {
-            dropdown.innerHTML = '<option value="">Unassigned</option>'; // Reset
+            dropdown.innerHTML = '<option value="">Unassigned</option>';
             members.forEach(member => {
                 const option = document.createElement('option');
                 option.value = member.user_id;

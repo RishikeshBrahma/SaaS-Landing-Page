@@ -10,7 +10,6 @@ import os
 app = Flask(__name__)
 
 # --- Configuration from Environment Variables ---
-# Reads all necessary credentials, including the port, from Render's environment
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST')
 app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER')
@@ -21,7 +20,6 @@ app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT'))
 bcrypt = Bcrypt(app)
 
 # --- Database Connection Pool ---
-# This block establishes a reliable connection to your Aiven database
 db_pool = None
 try:
     print("--- Attempting to create database connection pool... ---")
@@ -33,7 +31,6 @@ try:
         password=app.config['MYSQL_PASSWORD'],
         database=app.config['MYSQL_DB'],
         port=app.config['MYSQL_PORT'],
-        # These SSL settings are often required for secure cloud databases like Aiven
         ssl_ca=None,
         ssl_disabled=False,
         ssl_verify_cert=False
@@ -219,7 +216,6 @@ def get_tasks(project_id):
         if tasks:
             task_ids = tuple(tasks.keys())
             
-            # Handle case with single task_id to avoid trailing comma in SQL IN ()
             if len(task_ids) == 1:
                 subtask_query = "SELECT id, content, is_complete, task_id FROM subtasks WHERE task_id = %s"
                 cur.execute(subtask_query, (task_ids[0],))
@@ -502,4 +498,3 @@ def logout():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
-# config.py

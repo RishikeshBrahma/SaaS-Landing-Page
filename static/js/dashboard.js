@@ -1,26 +1,30 @@
 document.addEventListener('DOMContentLoaded', function() {
     const projectId = document.body.dataset.projectId;
     let members = [];
-    let tasksData = {}; // Store tasks to prevent re-fetching unless needed
+    let allTasks = {}; // Cache for all tasks
 
     if (!projectId || projectId === 'undefined' || projectId === null) {
-        console.error("Project ID is not defined. Halting execution.");
+        console.error("Project ID is not defined.");
         return;
     }
 
-    // --- Initial Data Load ---
-    // We will now call fetchTasks and fetchMembers only once at the start
+    // Initialize the application
     initializeApp();
 
     function initializeApp() {
         fetchMembers().then(() => {
             fetchTasks();
         });
+        initializeSortable();
+        setupEventListeners();
     }
 
-    // --- Drag and Drop Initialization ---
-    if (typeof Sortable !== 'undefined') {
-        const columns = document.querySelectorAll('.task-column');
+    function initializeSortable() {
+        if (typeof Sortable === 'undefined') {
+            console.error("Sortable.js is not loaded.");
+            return;
+        }
+        const columns = document.querySelectorAll('.task-cards');
         columns.forEach(column => {
             new Sortable(column, {
                 group: 'tasks',
@@ -32,50 +36,57 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-    } else {
-        console.error("Sortable.js is not loaded. Drag-and-drop will not work.");
     }
 
-    // --- Event Listeners for Modals ---
-    const addTaskBtn = document.getElementById('add-task-btn');
-    const addTaskModal = document.getElementById('add-task-modal');
-    const closeButtons = document.querySelectorAll('.close-button');
-    const manageMembersBtn = document.getElementById('manage-members-btn');
-    const membersModal = document.getElementById('members-modal');
+    function setupEventListeners() {
+        // Modal toggles
+        const addTaskBtn = document.getElementById('add-task-btn');
+        const manageMembersBtn = document.getElementById('manage-members-btn');
+        const addTaskModal = document.getElementById('add-task-modal');
+        const membersModal = document.getElementById('members-modal');
+        const taskDetailsModal = document.getElementById('task-details-modal');
 
-    if(addTaskBtn) addTaskBtn.onclick = () => addTaskModal.style.display = 'block';
-    if(manageMembersBtn) manageMembersBtn.onclick = () => membersModal.style.display = 'block';
+        if (addTaskBtn) addTaskBtn.onclick = () => addTaskModal.style.display = 'block';
+        if (manageMembersBtn) manageMembersBtn.onclick = () => membersModal.style.display = 'block';
 
-    closeButtons.forEach(button => {
-        button.onclick = () => button.closest('.modal').style.display = 'none';
-    });
+        document.querySelectorAll('.close-button').forEach(button => {
+            button.onclick = () => button.closest('.modal').style.display = 'none';
+        });
 
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-        }
-    };
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        };
 
-    // --- Form Submissions ---
-    document.getElementById('add-task-form').addEventListener('submit', addTask);
-    document.getElementById('add-member-form').addEventListener('submit', addMember);
+        // Form submissions
+        document.getElementById('add-task-form').addEventListener('submit', addTask);
+        document.getElementById('add-member-form').addEventListener('submit', addMember);
+        document.getElementById('edit-task-form').addEventListener('submit', saveTaskDetails);
+    }
 
-    // --- Core Functions ---
+    // --- Data Fetching ---
     async function fetchTasks() {
         try {
             const response = await fetch(`/projects/${projectId}/tasks`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            tasksData = data; // Store the fetched tasks
-            renderTasks(); // Render the stored tasks
+            
+            // Flatten the tasks into a single object for easy lookup
+            allTasks = {};
+            Object.values(data).flat().forEach(task => {
+                allTasks[task.id] = task;
+            });
+
+            renderTasks(data);
         } catch (error) {
             console.error("Error fetching tasks:", error);
         }
     }
 
     async function fetchMembers() {
-         try {
+        try {
             const response = await fetch(`/projects/${projectId}/members`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
@@ -88,23 +99,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function renderTasks() {
-        // This function now reads from the stored tasksData object
-        const todoCol = document.getElementById('todo-tasks');
-        const inprogressCol = document.getElementById('inprogress-tasks');
-        const doneCol = document.getElementById('done-tasks');
+    // --- UI Rendering ---
+    function renderTasks(tasksByStatus) {
+        const columns = {
+            todo: document.getElementById('todo-tasks'),
+            inprogress: document.getElementById('inprogress-tasks'),
+            done: document.getElementById('done-tasks')
+        };
+        // Clear all columns to prevent duplication
+        Object.values(columns).forEach(col => col.innerHTML = '');
 
-        // ** THE CRITICAL FIX IS HERE: Clear the columns every time before rendering **
-        todoCol.innerHTML = '';
-        inprogressCol.innerHTML = '';
-        doneCol.innerHTML = '';
-
-        for (const status in tasksData) {
-            const column = document.getElementById(`${status}-tasks`);
-            if (column) {
-                tasksData[status].forEach(task => {
+        for (const status in tasksByStatus) {
+            if (columns[status]) {
+                tasksByStatus[status].forEach(task => {
                     const taskCard = createTaskCard(task);
-                    column.appendChild(taskCard);
+                    columns[status].appendChild(taskCard);
                 });
             }
         }
@@ -117,76 +126,111 @@ document.addEventListener('DOMContentLoaded', function() {
         card.innerHTML = `
             <p>${escapeHTML(task.content)}</p>
             <div class="task-card-footer">
-                <span class="priority ${task.priority}">${task.priority || 'medium'}</span>
+                <span class="priority ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
                 <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
             </div>
         `;
-        card.addEventListener('click', () => openTaskDetails(task));
+        card.addEventListener('click', () => openTaskDetails(task.id));
         return card;
     }
 
+    // --- Task Actions (Add, Update, Delete) ---
     async function addTask(event) {
         event.preventDefault();
-        const content = document.getElementById('task-content').value;
-        const priority = document.getElementById('task-priority').value;
-        const dueDate = document.getElementById('task-due-date').value;
-        const assigneeId = document.getElementById('task-assignee').value;
-
+        const form = event.target;
         const response = await fetch(`/projects/${projectId}/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, priority, due_date: dueDate, assignee_id: assigneeId })
+            body: JSON.stringify({
+                content: form.querySelector('#task-content').value,
+                priority: form.querySelector('#task-priority').value,
+                due_date: form.querySelector('#task-due-date').value || null,
+                assignee_id: form.querySelector('#task-assignee').value || null
+            })
         });
         
         if (response.ok) {
-            document.getElementById('add-task-modal').style.display = 'none';
-            document.getElementById('add-task-form').reset();
-            await fetchTasks(); // Re-fetch and then re-render all tasks
+            form.closest('.modal').style.display = 'none';
+            form.reset();
+            await fetchTasks();
         } else {
             alert("Failed to add task.");
         }
     }
-    
-    function updateTaskStatus(taskId, newStatus) {
-        fetch(`/projects/${projectId}/tasks/${taskId}/status`, {
+
+    function openTaskDetails(taskId) {
+        const task = allTasks[taskId];
+        if (!task) return;
+
+        const modal = document.getElementById('task-details-modal');
+        const form = document.getElementById('edit-task-form');
+        
+        form.querySelector('#edit-task-id').value = task.id;
+        form.querySelector('#edit-task-content').value = task.content;
+        form.querySelector('#edit-task-priority').value = task.priority || 'medium';
+        form.querySelector('#edit-task-due-date').value = task.due_date || '';
+        form.querySelector('#edit-task-assignee').value = task.assignee_id || '';
+        
+        document.getElementById('delete-task-btn').onclick = () => deleteTask(task.id);
+        
+        modal.style.display = 'block';
+    }
+
+    async function saveTaskDetails(event) {
+        event.preventDefault();
+        const form = event.target;
+        const taskId = form.querySelector('#edit-task-id').value;
+
+        const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: form.querySelector('#edit-task-content').value,
+                priority: form.querySelector('#edit-task-priority').value,
+                due_date: form.querySelector('#edit-task-due-date').value || null,
+                assignee_id: form.querySelector('#edit-task-assignee').value || null
+            })
+        });
+
+        if (response.ok) {
+            form.closest('.modal').style.display = 'none';
+            await fetchTasks();
+        } else {
+            alert('Failed to save changes.');
+        }
+    }
+
+    async function updateTaskStatus(taskId, newStatus) {
+        await fetch(`/projects/${projectId}/tasks/${taskId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus })
         });
+        // No need to fetch here, Sortable handles the visual move.
+        // But we update our local cache for consistency.
+        if(allTasks[taskId]) allTasks[taskId].status = newStatus;
     }
 
     async function deleteTask(taskId) {
-        if (!confirm('Are you sure you want to delete this task?')) {
-            return;
-        }
+        if (!confirm('Are you sure you want to delete this task?')) return;
         
-        const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
-
+        const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
         if (response.ok) {
             document.getElementById('task-details-modal').style.display = 'none';
-            await fetchTasks(); // Re-fetch and then re-render all tasks
+            await fetchTasks(); 
         } else {
             alert('Failed to delete task.');
         }
     }
 
-    function openTaskDetails(task) {
-        const modal = document.getElementById('task-details-modal');
-        const deleteBtn = document.getElementById('delete-task-btn');
-        
-        deleteBtn.onclick = () => deleteTask(task.id);
-        
-        modal.style.display = 'block';
-    }
-
+    // --- Member Management ---
     function renderMembers() {
         const memberList = document.getElementById('member-list');
         memberList.innerHTML = '';
         members.forEach(member => {
             const li = document.createElement('li');
-            li.textContent = `${escapeHTML(member.name)} (${escapeHTML(member.email)}) - ${member.role}`;
+            li.className = 'member-item';
+            li.innerHTML = `<span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span> <span class="member-role">${member.role}</span>`;
             memberList.appendChild(li);
         });
     }
@@ -200,10 +244,9 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify({ email })
         });
         const data = await response.json();
-
         if (data.status === 'success') {
             document.getElementById('add-member-form').reset();
-            await fetchMembers(); // Re-fetch and then re-render members
+            await fetchMembers();
         } else {
             alert(`Error: ${data.error}`);
         }
@@ -212,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateAssigneeDropdowns() {
         const dropdowns = document.querySelectorAll('.assignee-dropdown');
         dropdowns.forEach(dropdown => {
+            const currentValue = dropdown.value;
             dropdown.innerHTML = '<option value="">Unassigned</option>';
             members.forEach(member => {
                 const option = document.createElement('option');
@@ -219,6 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 option.textContent = escapeHTML(member.name);
                 dropdown.appendChild(option);
             });
+            dropdown.value = currentValue;
         });
     }
 

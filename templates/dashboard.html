@@ -4,60 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - {{ project.name }}</title>
-    <!-- This will now link to the new combined and fixed style.css -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js" xintegrity="sha512-Eezs+g9Lq4TCCq0wae01s97wKye9A59hT3FhzS8qlKcgBIXXKSM8b9AUzflIpFk3EX0AUFNcmJN-ayMI+ZLjfA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 </head>
 <body data-project-id="{{ project_id }}">
     
-    <!-- This uses the new "navbar" class from your CSS -->
-    <header class="navbar">
-        <a href="{{ url_for('projects') }}" class="logo">{{ project.name }}</a>
-        <div class="nav-buttons">
-            <span class="nav-user-name">Welcome, {{ user_name }}!</span>
-            <button id="manage-members-btn" class="btn btn-secondary">Manage Members</button>
-            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+    <header class="dashboard-header">
+        <h1>{{ project.name }}</h1>
+        <div class="header-controls">
+            <span class="user-name">Welcome, {{ user_name }}!</span>
+            <button id="manage-members-btn" class="button">Manage Members</button>
+            <a href="{{ url_for('logout') }}" class="button">Logout</a>
         </div>
     </header>
 
-    <!-- The main container for the Kanban board -->
     <main class="container">
         <div class="kanban-board">
-            
-            <!-- Column 1: To Do -->
             <div class="kanban-column">
-                <h3>To Do</h3>
-                <!-- The id is still used by the JS, but the class is for styling -->
-                <div id="todo-tasks" class="task-cards">
-                    <!-- Task cards will be inserted here by JavaScript -->
-                </div>
+                <h2>To Do</h2>
+                <div id="todo-tasks" class="task-cards"></div>
             </div>
-
-            <!-- Column 2: In Progress -->
             <div class="kanban-column">
-                <h3>In Progress</h3>
-                <div id="inprogress-tasks" class="task-cards">
-                    <!-- Task cards will be inserted here by JavaScript -->
-                </div>
+                <h2>In Progress</h2>
+                <div id="inprogress-tasks" class="task-cards"></div>
             </div>
-
-            <!-- Column 3: Done -->
             <div class="kanban-column">
-                <h3>Done</h3>
-                <div id="done-tasks" class="task-cards">
-                    <!-- Task cards will be inserted here by JavaScript -->
-                </div>
+                <h2>Done</h2>
+                <div id="done-tasks" class="task-cards"></div>
             </div>
-
         </div>
     </main>
 
-    <button id="add-task-btn" class="btn btn-primary fab">+</button>
+    <button id="add-task-btn" class="button fab">+</button>
 
-    <!-- Modals -->
+    <!-- Add Task Modal -->
     <div id="add-task-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn">&times;</span>
+            <span class="close-button">&times;</span>
             <h2>Add New Task</h2>
             <form id="add-task-form">
                 <textarea id="task-content" placeholder="Task description..." required></textarea>
@@ -70,30 +53,46 @@
                 <select id="task-assignee" class="assignee-dropdown">
                     <option value="">Unassigned</option>
                 </select>
-                <button type="submit" class="btn btn-primary">Add Task</button>
+                <button type="submit" class="button">Add Task</button>
             </form>
         </div>
     </div>
 
+    <!-- Members Modal -->
     <div id="members-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn">&times;</span>
+            <span class="close-button">&times;</span>
             <h2>Manage Members</h2>
-            <h3>Current Members</h3>
             <ul id="member-list" class="members-list"></ul>
-            <form id="add-member-form" class="invite-form">
+            <form id="add-member-form">
                 <input type="email" id="member-email" placeholder="Enter member's email" required>
-                <button type="submit" class="btn btn-primary">Invite</button>
+                <button type="submit" class="button">Invite</button>
             </form>
         </div>
     </div>
 
+    <!-- Task Details / Edit Modal -->
     <div id="task-details-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Task Details</h2>
-            <!-- You can add the full task details form here later -->
-            <button id="delete-task-btn" class="btn btn-secondary">Delete Task</button>
+            <span class="close-button">&times;</span>
+            <h2>Edit Task</h2>
+            <form id="edit-task-form">
+                <input type="hidden" id="edit-task-id">
+                <textarea id="edit-task-content" required></textarea>
+                <select id="edit-task-priority">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <input type="date" id="edit-task-due-date">
+                <select id="edit-task-assignee" class="assignee-dropdown">
+                    <option value="">Unassigned</option>
+                </select>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="submit" class="button">Save Changes</button>
+                    <button type="button" id="delete-task-btn" class="button button-danger">Delete Task</button>
+                </div>
+            </form>
         </div>
     </div>
 

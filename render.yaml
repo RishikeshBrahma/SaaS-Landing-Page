@@ -1,9 +1,10 @@
-# render.yaml for the web service only
+# render.yaml for the web service only, explicitly using the free plan
 
 services:
   - type: web
     name: saas-project-manager
     env: python
+    plan: free # Explicitly setting the web service to the free tier
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:

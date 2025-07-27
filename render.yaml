@@ -1,18 +1,15 @@
-# render.yaml (Corrected for Render's requirements)
+# A clean and simple render.yaml for a Flask and MySQL app
+
 services:
-  # 1. Your Web Application Service
+  # This is the web service for your Python application
   - type: web
     name: saas-project-manager
     env: python
-    pythonVersion: "3.11" # Specifying the Python version is good practice
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
-      # This tells Render to create a secure, random secret key for you
       - key: SECRET_KEY
         generateValue: true
-      # The following variables connect your app to the database service below
-      # Render will automatically fill these in with the correct credentials
       - key: MYSQL_HOST
         fromDatabase:
           name: saas-mysql-db
@@ -30,14 +27,8 @@ services:
           name: saas-mysql-db
           property: database
 
-  # 2. Your Database Service (Corrected and Simplified)
-  - type: db  # This is the correct type for a database
-    name: saas-mysql-db # This name must match the 'fromDatabase' name above
-    engine: mysql # Specify the database engine
-    plan: free # The free plan is supported for this service type
-    env: mysql
-    envVars:  
-      - key: MYSQL_ROOT_PASSWORD
-        generateValue: true # Generates a secure password for the root user
-      - key: MYSQL_DATABASE
-        value: saas_db # The name of your database, can be customized
+  # This is the managed MySQL database service
+  - type: db
+    name: saas-mysql-db
+    engine: mysql
+    plan: free

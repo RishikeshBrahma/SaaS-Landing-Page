@@ -5,6 +5,7 @@ services:
   - type: web
     name: saas-project-manager
     env: python
+    pythonVersion: "3.11" # Explicitly setting the Python version
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
@@ -32,3 +33,4 @@ services:
     name: saas-mysql-db
     engine: mysql
     plan: free
+    databaseVersion: "8" # Specifying the database version

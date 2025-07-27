@@ -1,11 +1,12 @@
-/* --- Professional Redesign with Vibrant Animations --- */
+/* --- Final, Complete & Professional Stylesheet --- */
 
-/* CSS Variables for a Consistent Theme */
+/* Modern CSS Variables for a Consistent Design */
 :root {
-    --bg-dark-navy: #0d213f;
-    --bg-light-navy: #112240;
+    --bg-dark-navy: #07234d;
+    --bg-light-navy: #0a357f;
     --text-lightest: #ccd6f6;
     --text-light: #a8b2d1;
+    --text-dark: #8892b0;
     --accent-vibrant: #64ffda;
     --shadow-color: rgba(2, 12, 27, 0.7);
     --border-radius: 8px;
@@ -19,46 +20,118 @@ body {
     color: var(--text-light);
     margin: 0;
     line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: auto;
-    padding: 2rem;
+    padding: 0 2rem;
 }
 
-/* --- Header & Navigation --- */
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
+/* --- Shared Header / Navbar --- */
+header {
     background-color: rgba(10, 25, 47, 0.85);
     backdrop-filter: blur(10px);
+    padding: 1rem 0;
     border-bottom: 1px solid var(--bg-light-navy);
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
-.dashboard-header h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    color: var(--text-lightest);
+header .container, .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem; /* Consistent padding */
 }
 
-.header-controls {
+.logo, .dashboard-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-lightest);
+    text-decoration: none;
+}
+
+.main-nav a, .header-controls a, .header-controls button {
+    color: var(--accent-vibrant);
+    background-color: transparent;
+    border: 1px solid var(--accent-vibrant);
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+    margin-left: 1rem;
+}
+
+.main-nav a:hover, .header-controls a:hover, .header-controls button:hover {
+    background-color: rgba(100, 255, 218, 0.1);
+}
+
+/* --- Landing Page (index.html) --- */
+.hero {
+    padding: 100px 0;
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    color: var(--text-lightest);
+    margin-bottom: 1.5rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    color: var(--text-light);
+    margin-bottom: 2rem;
+}
+
+.auth-buttons .button {
+    margin: 0 10px;
+}
+
+/* --- Projects Page (projects.html) --- */
+.projects-container {
+    padding: 2rem;
+}
+
+.projects-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 2rem;
+}
+
+.project-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
 }
 
-.user-name {
-    font-weight: 500;
+.project-card {
+    background: var(--bg-light-navy);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    color: var(--text-light);
+    transition: var(--transition);
+    box-shadow: 0 10px 30px -15px var(--shadow-color);
 }
 
-/* --- Kanban Board --- */
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 30px -15px var(--shadow-color);
+}
+
+.project-card h3 {
+    margin-top: 0;
+    color: var(--text-lightest);
+}
+
+/* --- Dashboard Page (dashboard.html) --- */
 .kanban-board {
     display: flex;
     justify-content: space-between;
@@ -72,7 +145,6 @@ body {
     background: var(--bg-light-navy);
     border-radius: var(--border-radius);
     padding: 1.5rem;
-    min-height: 500px;
 }
 
 .kanban-column h2 {
@@ -93,7 +165,6 @@ body {
     gap: 1rem;
 }
 
-/* --- Task Card with Animations --- */
 .task-card {
     background: #172a45;
     border-radius: var(--border-radius);
@@ -101,18 +172,14 @@ body {
     box-shadow: 0 10px 30px -15px var(--shadow-color);
     cursor: grab;
     transition: var(--transition);
-    border-left: 4px solid transparent;
 }
 
 .task-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 20px 30px -15px var(--shadow-color);
 }
 
 .task-card p {
     margin: 0 0 1rem 0;
-    font-size: 1rem;
-    font-weight: 500;
     color: var(--text-lightest);
 }
 
@@ -121,7 +188,6 @@ body {
     justify-content: space-between;
     align-items: center;
     font-size: 0.85rem;
-    color: var(--text-light);
 }
 
 .priority {
@@ -129,14 +195,13 @@ body {
     border-radius: 20px;
     font-weight: 600;
     color: var(--bg-dark-navy);
-    font-size: 0.75rem;
     text-transform: uppercase;
 }
 .priority.low { background-color: #8892b0; }
 .priority.medium { background-color: #ffc107; }
 .priority.high { background-color: var(--accent-vibrant); }
 
-/* --- Buttons --- */
+/* --- Shared Components (Buttons, Modals, Forms) --- */
 .button {
     color: var(--accent-vibrant);
     background-color: transparent;
@@ -144,22 +209,11 @@ body {
     border-radius: 4px;
     padding: 0.75rem 1.5rem;
     font-size: 0.9rem;
-    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
     cursor: pointer;
     transition: var(--transition);
-    text-decoration: none;
 }
-
 .button:hover {
     background-color: rgba(100, 255, 218, 0.1);
-}
-
-.button-danger {
-    color: #ff7b72;
-    border-color: #ff7b72;
-}
-.button-danger:hover {
-    background-color: rgba(255, 123, 114, 0.1);
 }
 
 .fab {
@@ -176,7 +230,6 @@ body {
     z-index: 999;
 }
 
-/* --- Modals --- */
 .modal {
     display: none;
     position: fixed;
@@ -215,7 +268,6 @@ body {
     color: var(--accent-vibrant);
 }
 
-/* --- Forms --- */
 form input, form select, form textarea {
     width: 100%;
     padding: 1rem;
@@ -224,7 +276,6 @@ form input, form select, form textarea {
     border-radius: var(--border-radius);
     box-sizing: border-box;
     background: var(--bg-dark-navy);
-    transition: var(--transition);
     font-size: 1rem;
     color: var(--text-lightest);
 }
@@ -233,25 +284,4 @@ form input:focus, form select:focus, form textarea:focus {
     outline: none;
     border-color: var(--accent-vibrant);
     box-shadow: 0 0 0 2px rgba(100, 255, 218, 0.1);
-}
-
-textarea {
-    min-height: 120px;
-    resize: vertical;
-}
-
-.members-list {
-    list-style: none;
-    padding: 0;
-    margin: 1.5rem 0;
-}
-
-.member-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: var(--bg-dark-navy);
-    border-radius: var(--border-radius);
-    margin-bottom: 0.75rem;
 }

@@ -3,104 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ project.name }} - Saasfy</title>
+    <title>Dashboard - {{ project.name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- THIS IS THE FIX: Add the Socket.IO client library -->
-    
+    <!-- FIX 1: Load the Sortable.js library for drag-and-drop functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js" xintegrity="sha512-Eezs+g9Lq4TCCq0wae01s97wKye9A59hT3FhzS8qlKcgBIXXKSM8b9AUzflIpFk3EX0AUFNcmJN-ayMI+ZLjfA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <a href="{{ url_for('projects') }}" class="logo">Saasfy</a>
-        <ul class="nav-links">
-            <li><a href="{{ url_for('projects') }}"> &larr; Back to Boards</a></li>
-        </ul>
-        <div class="nav-buttons">
-            <span class="nav-user-name">Welcome, {{ user_name }}!</span>
-            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+<!-- FIX 2: Pass the project_id to the JavaScript using a data attribute -->
+<body data-project-id="{{ project_id }}">
+    <header class="dashboard-header">
+        <h1>{{ project.name }}</h1>
+        <div class="header-controls">
+            <span class="user-name">Welcome, {{ user_name }}!</span>
+            <button id="manage-members-btn" class="button">Manage Members</button>
+            <a href="{{ url_for('logout') }}" class="button button-secondary">Logout</a>
         </div>
-    </nav>
+    </header>
 
-    <!-- Main Dashboard Content -->
-    <div class="container" style="padding: 2rem; max-width: 1200px; margin: auto;" data-project-id="{{ project_id }}">
-        <header class="dashboard-header" style="display:flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h1>{{ project.name }}</h1>
-                <p>Drag and drop tasks, or click a task to edit.</p>
-            </div>
-            <div>
-                <button id="open-manage-modal-btn" class="btn btn-secondary">Manage Board</button>
-                <button id="open-task-modal-btn" class="btn btn-primary">Add New Task</button>
-            </div>
-        </header>
-
-        <!-- Filter and Search Controls -->
-        <div class="filter-container">
-            <input type="text" id="search-input" placeholder="Search tasks...">
-            <div class="filter-buttons">
-                <span>Priority:</span>
-                <button class="filter-btn active" data-priority="all">All</button>
-                <button class="filter-btn" data-priority="high">High</button>
-                <button class="filter-btn" data-priority="medium">Medium</button>
-                <button class="filter-btn" data-priority="low">Low</button>
+    <main class="kanban-board">
+        <div class="task-status-column">
+            <h2>To Do</h2>
+            <div id="todo-tasks" class="task-column">
+                <!-- Task cards will be inserted here by JavaScript -->
             </div>
         </div>
+        <div class="task-status-column">
+            <h2>In Progress</h2>
+            <div id="inprogress-tasks" class="task-column">
+                <!-- Task cards will be inserted here by JavaScript -->
+            </div>
+        </div>
+        <div class="task-status-column">
+            <h2>Done</h2>
+            <div id="done-tasks" class="task-column">
+                <!-- Task cards will be inserted here by JavaScript -->
+            </div>
+        </div>
+    </main>
 
-        <!-- Kanban Board Structure -->
-        <div class="kanban-board">
-            <div class="kanban-column" data-status="todo"><h3>To Do</h3><ul class="task-cards" id="tasks-todo"></ul></div>
-            <div class="kanban-column" data-status="inprogress"><h3>In Progress</h3><ul class="task-cards" id="tasks-inprogress"></ul></div>
-            <div class="kanban-column" data-status="done"><h3>Done</h3><ul class="task-cards" id="tasks-done"></ul></div>
+    <button id="add-task-btn" class="fab">+</button>
+
+    <!-- Add Task Modal -->
+    <div id="add-task-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Add New Task</h2>
+            <form id="add-task-form">
+                <textarea id="task-content" placeholder="Task description..." required></textarea>
+                <select id="task-priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <input type="date" id="task-due-date">
+                <select id="task-assignee" class="assignee-dropdown">
+                    <option value="">Unassigned</option>
+                </select>
+                <button type="submit" class="button">Add Task</button>
+            </form>
         </div>
     </div>
 
-    <!-- Add/Edit Task Modal -->
-    <div id="task-modal" class="modal">
+    <!-- Members Modal -->
+    <div id="members-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2 id="modal-title">Add New Task</h2>
-            <form id="task-form">
-                <input type="hidden" id="task-id">
-                <label for="task-content">Task Description</label>
-                <input type="text" id="task-content" required>
-                <label for="task-assignee">Assign To</label>
-                <select id="task-assignee"><option value="">Unassigned</option></select>
-                <label for="task-due-date">Due Date</label>
-                <input type="date" id="task-due-date">
-                <label for="task-priority">Priority</label>
-                <select id="task-priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
-                <br><br>
-                <button type="submit" class="btn btn-primary">Save Task</button>
+            <span class="close-button">&times;</span>
+            <h2>Manage Members</h2>
+            <h3>Current Members</h3>
+            <ul id="member-list"></ul>
+            <h3>Invite New Member</h3>
+            <form id="add-member-form">
+                <input type="email" id="member-email" placeholder="Enter member's email" required>
+                <button type="submit" class="button">Invite</button>
             </form>
-            <div class="subtask-container" id="subtask-section" style="display: none;">
-                <h4>Checklist</h4>
-                <ul class="subtask-list" id="subtask-list"></ul>
-                <form id="add-subtask-form"><input type="text" id="subtask-content" placeholder="Add a checklist item..."><button type="submit" class="btn btn-secondary">Add</button></form>
-            </div>
-            <div class="comment-container" id="comment-section" style="display: none;">
-                <h4>Activity & Comments</h4>
-                <ul class="comment-list" id="comment-list"></ul>
+        </div>
+    </div>
+
+    <!-- Task Details Modal (Structure Only) -->
+    <div id="task-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Task Details</h2>
+            <form id="edit-task-form">
+                <!-- Details will be populated by JS -->
+            </form>
+            <div id="comments-section">
+                <h3>Comments</h3>
+                <div id="comments-list"></div>
                 <form id="add-comment-form">
-                    <textarea id="comment-content" placeholder="Write a comment..." required></textarea>
-                    <button type="submit" class="btn btn-secondary">Send</button>
+                    <input type="text" id="new-comment-content" placeholder="Add a comment..." required>
+                    <button type="submit" class="button">Post</button>
                 </form>
             </div>
-        </div>
-    </div>
-
-    <!-- Manage Board Modal -->
-    <div id="manage-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Manage Board: {{ project.name }}</h2>
-            <h4>Current Members</h4>
-            <ul class="members-list" id="members-list"></ul>
-            <form id="invite-form">
-                <h4>Invite New Member</h4>
-                <input type="email" id="invite-email" placeholder="Enter user's email address" required>
-                <button type="submit" class="btn btn-primary">Send Invite</button>
-            </form>
+            <div id="subtasks-section">
+                <h3>Subtasks</h3>
+                <div id="subtasks-list"></div>
+                <form id="add-subtask-form">
+                    <input type="text" id="new-subtask-content" placeholder="Add a subtask..." required>
+                    <button type="submit" class="button">Add</button>
+                </form>
+            </div>
+            <button id="delete-task-btn" class="button button-danger">Delete Task</button>
         </div>
     </div>
 

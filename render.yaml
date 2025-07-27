@@ -1,28 +1,26 @@
-# render.yaml for the web service only, explicitly using the free plan
+# Final, stable render.yaml for a Flask and external MySQL app
 
 services:
   - type: web
-    name: saas-project-manager
+    name: saas-project-manager # This must match your current service name
     env: python
-    plan: free # Explicitly setting the web service to the free tier
+    # Lock in a stable Python version to prevent compatibility issues
+    pythonVersion: "3.11"
+    plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
+    # This section tells Render to use the environment variables
+    # you have already set up in the dashboard.
     envVars:
-      - key: SECRET_KEY
-        generateValue: true
       - key: MYSQL_HOST
-        fromDatabase:
-          name: saas-mysql-db # This must exactly match the name you gave your DB
-          property: host
+        fromEnvVar: MYSQL_HOST
       - key: MYSQL_USER
-        fromDatabase:
-          name: saas-mysql-db
-          property: user
+        fromEnvVar: MYSQL_USER
       - key: MYSQL_PASSWORD
-        fromDatabase:
-          name: saas-mysql-db
-          property: password
+        fromEnvVar: MYSQL_PASSWORD
       - key: MYSQL_DB
-        fromDatabase:
-          name: saas-mysql-db
-          property: database
+        fromEnvVar: MYSQL_DB
+      - key: MYSQL_PORT
+        fromEnvVar: MYSQL_PORT
+      - key: SECRET_KEY
+        fromEnvVar: SECRET_KEY

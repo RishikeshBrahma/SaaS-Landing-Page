@@ -9,7 +9,8 @@ import os
 
 app = Flask(__name__)
 
-# --- This section is the only part that is modified to work with Render ---
+# --- This is the corrected database connection section ---
+# It uses all the environment variables from Render to connect to your Aiven database
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST')
 app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER')
@@ -42,7 +43,7 @@ def get_db_connection():
     if not db_pool:
         raise Exception("Database pool is not available.")
     return db_pool.get_connection()
-# --- End of modifications ---
+# --- End of corrections ---
 
 
 # --- ALL OF YOUR ORIGINAL FUNCTIONS ARE BELOW, UNCHANGED ---
@@ -450,3 +451,4 @@ def logout():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
+# config.py 

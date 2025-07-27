@@ -10,10 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchTasks();
     fetchMembers();
 
-    // --- FIX: Initialize Sortable on each column individually ---
+    // Initialize Sortable on each column individually
     if (typeof Sortable !== 'undefined') {
         const columns = document.querySelectorAll('.task-column');
-        // Loop through each column and make it sortable
         columns.forEach(column => {
             new Sortable(column, {
                 group: 'tasks',
@@ -28,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error("Sortable.js is not loaded. Drag-and-drop will not work.");
     }
-    // --- END FIX ---
 
 
     // --- Event Listeners for Modals ---
@@ -87,9 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderTasks(tasksByStatus) {
+        // *** THE FIX IS HERE: Clear the columns before adding new tasks ***
         document.getElementById('todo-tasks').innerHTML = '';
         document.getElementById('inprogress-tasks').innerHTML = '';
         document.getElementById('done-tasks').innerHTML = '';
+        // *** END FIX ***
 
         for (const status in tasksByStatus) {
             const column = document.getElementById(`${status}-tasks`);

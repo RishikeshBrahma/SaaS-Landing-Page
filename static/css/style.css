@@ -565,7 +565,7 @@ form label {
     padding-bottom: 1rem;
     border-bottom: 2px solid rgba(102, 126, 234, 0.1);
     font-weight: 700;
-    color: var(--text-primary);
+    color: #465a68;
 }
 
 .task-cards {
@@ -605,7 +605,7 @@ form label {
     margin: 0 0 0.75rem 0;
     font-size: 1rem;
     font-weight: 500;
-    color: var(--text-primary);
+    color: #ffffff
 }
 
 .task-meta {
@@ -613,7 +613,7 @@ form label {
     justify-content: space-between;
     align-items: center;
     font-size: 0.85rem;
-    color: var(--text-muted);
+    color: #c6daf3;
     margin-top: 0.5rem;
 }
 

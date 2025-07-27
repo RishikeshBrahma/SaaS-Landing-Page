@@ -1,16 +1,24 @@
 document.addEventListener('DOMContentLoaded', function() {
     const projectId = document.body.dataset.projectId;
     let members = [];
+    let tasksData = {}; // Store tasks to prevent re-fetching unless needed
 
     if (!projectId || projectId === 'undefined' || projectId === null) {
         console.error("Project ID is not defined. Halting execution.");
         return;
     }
 
-    fetchTasks();
-    fetchMembers();
+    // --- Initial Data Load ---
+    // We will now call fetchTasks and fetchMembers only once at the start
+    initializeApp();
 
-    // Initialize Sortable on each column individually
+    function initializeApp() {
+        fetchMembers().then(() => {
+            fetchTasks();
+        });
+    }
+
+    // --- Drag and Drop Initialization ---
     if (typeof Sortable !== 'undefined') {
         const columns = document.querySelectorAll('.task-column');
         columns.forEach(column => {
@@ -28,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Sortable.js is not loaded. Drag-and-drop will not work.");
     }
 
-
     // --- Event Listeners for Modals ---
     const addTaskBtn = document.getElementById('add-task-btn');
     const addTaskModal = document.getElementById('add-task-modal');
@@ -40,9 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(manageMembersBtn) manageMembersBtn.onclick = () => membersModal.style.display = 'block';
 
     closeButtons.forEach(button => {
-        button.onclick = () => {
-            button.closest('.modal').style.display = 'none';
-        };
+        button.onclick = () => button.closest('.modal').style.display = 'none';
     });
 
     window.onclick = function(event) {
@@ -56,45 +61,48 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('add-member-form').addEventListener('submit', addMember);
 
     // --- Core Functions ---
-    function fetchTasks() {
-        fetch(`/projects/${projectId}/tasks`)
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                renderTasks(data);
-            })
-            .catch(error => console.error("Error fetching tasks:", error));
+    async function fetchTasks() {
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            tasksData = data; // Store the fetched tasks
+            renderTasks(); // Render the stored tasks
+        } catch (error) {
+            console.error("Error fetching tasks:", error);
+        }
     }
 
-    function fetchMembers() {
-        fetch(`/projects/${projectId}/members`)
-            .then(response => {
-                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                members = data;
-                populateAssigneeDropdowns();
-                renderMembers(data);
-            })
-            .catch(error => console.error("Error fetching members:", error));
+    async function fetchMembers() {
+         try {
+            const response = await fetch(`/projects/${projectId}/members`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            members = data;
+            populateAssigneeDropdowns();
+            renderMembers();
+        } catch (error) {
+            console.error("Error fetching members:", error);
+        }
     }
 
-    function renderTasks(tasksByStatus) {
-        // *** THE FIX IS HERE: Clear the columns before adding new tasks ***
-        document.getElementById('todo-tasks').innerHTML = '';
-        document.getElementById('inprogress-tasks').innerHTML = '';
-        document.getElementById('done-tasks').innerHTML = '';
-        // *** END FIX ***
+    function renderTasks() {
+        // This function now reads from the stored tasksData object
+        const todoCol = document.getElementById('todo-tasks');
+        const inprogressCol = document.getElementById('inprogress-tasks');
+        const doneCol = document.getElementById('done-tasks');
 
-        for (const status in tasksByStatus) {
+        // ** THE CRITICAL FIX IS HERE: Clear the columns every time before rendering **
+        todoCol.innerHTML = '';
+        inprogressCol.innerHTML = '';
+        doneCol.innerHTML = '';
+
+        for (const status in tasksData) {
             const column = document.getElementById(`${status}-tasks`);
             if (column) {
-                tasksByStatus[status].forEach(task => {
+                tasksData[status].forEach(task => {
                     const taskCard = createTaskCard(task);
                     column.appendChild(taskCard);
                 });
@@ -117,26 +125,26 @@ document.addEventListener('DOMContentLoaded', function() {
         return card;
     }
 
-    function addTask(event) {
+    async function addTask(event) {
         event.preventDefault();
         const content = document.getElementById('task-content').value;
         const priority = document.getElementById('task-priority').value;
         const dueDate = document.getElementById('task-due-date').value;
         const assigneeId = document.getElementById('task-assignee').value;
 
-        fetch(`/projects/${projectId}/tasks`, {
+        const response = await fetch(`/projects/${projectId}/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content, priority, due_date: dueDate, assignee_id: assigneeId })
-        }).then(response => {
-            if (response.ok) {
-                document.getElementById('add-task-modal').style.display = 'none';
-                document.getElementById('add-task-form').reset();
-                fetchTasks();
-            } else {
-                alert("Failed to add task.");
-            }
         });
+        
+        if (response.ok) {
+            document.getElementById('add-task-modal').style.display = 'none';
+            document.getElementById('add-task-form').reset();
+            await fetchTasks(); // Re-fetch and then re-render all tasks
+        } else {
+            alert("Failed to add task.");
+        }
     }
     
     function updateTaskStatus(taskId, newStatus) {
@@ -147,21 +155,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function deleteTask(taskId) {
+    async function deleteTask(taskId) {
         if (!confirm('Are you sure you want to delete this task?')) {
             return;
         }
         
-        fetch(`/projects/${projectId}/tasks/${taskId}`, {
+        const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, {
             method: 'DELETE'
-        }).then(response => {
-            if (response.ok) {
-                document.getElementById('task-details-modal').style.display = 'none';
-                fetchTasks(); 
-            } else {
-                alert('Failed to delete task.');
-            }
         });
+
+        if (response.ok) {
+            document.getElementById('task-details-modal').style.display = 'none';
+            await fetchTasks(); // Re-fetch and then re-render all tasks
+        } else {
+            alert('Failed to delete task.');
+        }
     }
 
     function openTaskDetails(task) {
@@ -173,8 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.style.display = 'block';
     }
 
-    // --- Member Management ---
-    function renderMembers(members) {
+    function renderMembers() {
         const memberList = document.getElementById('member-list');
         memberList.innerHTML = '';
         members.forEach(member => {
@@ -184,23 +191,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function addMember(event) {
+    async function addMember(event) {
         event.preventDefault();
         const email = document.getElementById('member-email').value;
-        fetch(`/projects/${projectId}/members`, {
+        const response = await fetch(`/projects/${projectId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                document.getElementById('add-member-form').reset();
-                fetchMembers();
-            } else {
-                alert(`Error: ${data.error}`);
-            }
         });
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            document.getElementById('add-member-form').reset();
+            await fetchMembers(); // Re-fetch and then re-render members
+        } else {
+            alert(`Error: ${data.error}`);
+        }
     }
     
     function populateAssigneeDropdowns() {
@@ -216,7 +222,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Helper function to prevent XSS attacks
     function escapeHTML(str) {
         if (str === null || str === undefined) return '';
         const p = document.createElement('p');

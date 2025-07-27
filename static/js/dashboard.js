@@ -7,7 +7,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     const project_id = mainContainer.dataset.projectId;
 
-    // Task Modal Elements
+
+
+
+
+    // --- All other element selectors ---
     const taskModal = document.getElementById('task-modal');
     const openTaskModalBtn = document.getElementById('open-task-modal-btn');
     const closeTaskModalBtn = taskModal.querySelector('.close-btn');
@@ -26,15 +30,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const commentList = document.getElementById('comment-list');
     const addCommentForm = document.getElementById('add-comment-form');
     const commentContentInput = document.getElementById('comment-content');
-
-    // Manage Modal Elements
     const manageModal = document.getElementById('manage-modal');
     const openManageModalBtn = document.getElementById('open-manage-modal-btn');
     const closeManageModalBtn = manageModal.querySelector('.close-btn');
     const membersList = document.getElementById('members-list');
     const inviteForm = document.getElementById('invite-form');
-
-    // Other UI Elements
     const searchInput = document.getElementById('search-input');
     const filterButtonContainer = document.querySelector('.filter-buttons');
     const columns = {
@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const method = taskId ? 'PUT' : 'POST';
         try {
             const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskData) });
-            if (response.ok) { hideModal(taskModal); fetchAndRenderAll(); } 
+            if (response.ok) { hideModal(taskModal); } 
             else { alert(`Failed to ${taskId ? 'update' : 'add'} task.`); }
         } catch (error) { console.error('Error:', error); }
     });
@@ -253,7 +253,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 commentContentInput.value = '';
                 fetchAndRenderComments(taskId);
-                fetchAndRenderAll();
             } else { alert('Failed to post comment.'); }
         } catch (error) { console.error('Error posting comment:', error); }
     });
@@ -272,7 +271,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (task) {
                     task.subtasks.push(newSubtask);
                     renderSubtasks(task.subtasks);
-                    fetchAndRenderAll();
                 }
             } else { alert('Failed to add sub-task.'); }
         } catch (error) { console.error('Error:', error); }
@@ -285,7 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const is_complete = e.target.checked;
             try {
                 await fetch(`/projects/${project_id}/subtasks/${subtaskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_complete }) });
-                fetchAndRenderAll();
                 subtaskItem.classList.toggle('completed', is_complete);
             } catch (error) { console.error('Error updating subtask:', error); }
         }
@@ -298,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target.classList.contains('delete-btn')) {
             e.stopPropagation();
             if (confirm('Are you sure you want to delete this task?')) {
-                fetch(`/projects/${project_id}/tasks/${taskId}`, { method: 'DELETE' }).then(fetchAndRenderAll).catch(err => console.error('Delete Error:', err));
+                fetch(`/projects/${project_id}/tasks/${taskId}`, { method: 'DELETE' }).catch(err => console.error('Delete Error:', err));
             }
             return;
         }
@@ -331,11 +328,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (draggedCard) {
                 const newStatus = column.dataset.status;
                 const taskId = draggedCard.dataset.taskId;
+                const originalParent = draggedCard.parentElement;
                 column.querySelector('.task-cards').appendChild(draggedCard);
                 try {
                     await fetch(`/projects/${project_id}/tasks/${taskId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
-                    fetchAndRenderAll();
-                } catch (error) { console.error('Error updating status:', error); fetchAndRenderAll(); }
+                } catch (error) { 
+                    console.error('Error updating status:', error);
+                    originalParent.appendChild(draggedCard); // Revert on error
+                }
             }
         });
     });

@@ -6,6 +6,8 @@
     <title>{{ project.name }} - Saasfy</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- THIS IS THE FIX: Add the Socket.IO client library -->
+    
 </head>
 <body>
     <!-- Navigation -->
@@ -53,7 +55,7 @@
         </div>
     </div>
 
-    <!-- Add/Edit Task Modal (THIS WAS MISSING/BROKEN) -->
+    <!-- Add/Edit Task Modal -->
     <div id="task-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>

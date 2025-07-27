@@ -1,3 +1,8 @@
+<!-- 
+    ============================================================
+    FILE: templates/projects.html
+    ============================================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,20 +12,17 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <a href="{{ url_for('projects') }}" class="logo">My Projects</a>
-            <nav class="main-nav">
-                <span style="margin-right: 1rem;">Welcome, {{ user_name }}!</span>
-                <a href="{{ url_for('logout') }}">Logout</a>
-            </nav>
+    <header class="navbar">
+        <a href="{{ url_for('projects') }}" class="logo">My Projects</a>
+        <div class="nav-buttons">
+            <span class="nav-user-name">Welcome, {{ user_name }}!</span>
+            <a href="{{ url_for('logout') }}" class="btn">Logout</a>
         </div>
     </header>
-
     <main class="container projects-container">
         <div class="projects-header">
             <h1>Your Projects</h1>
-            <button id="add-project-btn" class="button">Create New Project</button>
+            <button id="add-project-btn" class="btn">Create New Project</button>
         </div>
         <div id="project-list" class="project-list">
             {% for project in projects %}
@@ -31,48 +33,16 @@
             {% endfor %}
         </div>
     </main>
-
-    <!-- Add Project Modal -->
     <div id="add-project-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
             <h2>Create New Project</h2>
             <form id="add-project-form">
                 <input type="text" id="project-name" placeholder="Project Name" required>
-                <button type="submit" class="button">Create</button>
+                <button type="submit" class="btn">Create</button>
             </form>
         </div>
     </div>
-
     <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
 </body>
 </html>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const addProjectBtn = document.getElementById('add-project-btn');
-        const addProjectModal = document.getElementById('add-project-modal');
-        const closeButton = addProjectModal.querySelector('.close-button');
-
-        addProjectBtn.addEventListener('click', function() {
-            addProjectModal.style.display = 'block';
-        });
-
-        closeButton.addEventListener('click', function() {
-            addProjectModal.style.display = 'none';
-        });
-
-        window.addEventListener('click', function(event) {
-            if (event.target === addProjectModal) {
-                addProjectModal.style.display = 'none';
-            }
-        });
-
-        document.getElementById('add-project-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const projectName = document.getElementById('project-name').value;
-            // Add AJAX call to create project here
-            console.log(`Creating project: ${projectName}`);
-            // Close modal after submission
-            addProjectModal.style.display = 'none';
-        });
-    });

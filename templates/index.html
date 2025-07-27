@@ -1,3 +1,5 @@
+
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,24 +14,21 @@
             <a href="/" class="logo">Saasify</a>
             <nav class="main-nav">
                 <a href="#" id="login-btn-nav">Login</a>
-                <a href="#" id="signup-btn-nav" class="button">Get Started</a>
+                <a href="#" id="signup-btn-nav" class="btn">Get Started</a>
             </nav>
         </div>
     </header>
-
     <main>
         <section class="hero">
             <div class="hero-content">
                 <h1>Organize Your Workflow, Brilliantly</h1>
                 <p>The ultimate platform for seamless team collaboration and productivity.</p>
                 <div class="auth-buttons">
-                    <a href="#" id="get-started-btn" class="button">Get Started</a>
+                    <a href="#" id="get-started-btn" class="btn">Get Started</a>
                 </div>
             </div>
         </section>
     </main>
-
-    <!-- Login Modal -->
     <div id="login-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -37,12 +36,10 @@
             <form id="login-form">
                 <input type="email" id="login-email" placeholder="Email" required>
                 <input type="password" id="login-password" placeholder="Password" required>
-                <button type="submit" class="button">Login</button>
+                <button type="submit" class="btn">Login</button>
             </form>
         </div>
     </div>
-
-    <!-- Signup Modal -->
     <div id="signup-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -51,11 +48,371 @@
                 <input type="text" id="signup-name" placeholder="Full Name" required>
                 <input type="email" id="signup-email" placeholder="Email" required>
                 <input type="password" id="signup-password" placeholder="Password" required>
-                <button type="submit" class="button">Create Account</button>
+                <button type="submit" class="btn">Create Account</button>
             </form>
         </div>
     </div>
-
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
+```html
+<!-- templates/projects.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Projects</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <a href="{{ url_for('projects') }}" class="logo">My Projects</a>
+        <div class="nav-buttons">
+            <span class="nav-user-name">Welcome, {{ user_name }}!</span>
+            <a href="{{ url_for('logout') }}" class="btn">Logout</a>
+        </div>
+    </header>
+    <main class="container projects-container">
+        <div class="projects-header">
+            <h1>Your Projects</h1>
+            <button id="add-project-btn" class="btn">Create New Project</button>
+        </div>
+        <div id="project-list" class="project-list">
+            {% for project in projects %}
+                <a href="{{ url_for('dashboard', project_id=project.id) }}" class="project-card">
+                    <h3>{{ project.name }}</h3>
+                    <p>Owner: {{ project.owner_name }}</p>
+                </a>
+            {% endfor %}
+        </div>
+    </main>
+    <div id="add-project-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Create New Project</h2>
+            <form id="add-project-form">
+                <input type="text" id="project-name" placeholder="Project Name" required>
+                <button type="submit" class="btn">Create</button>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
+</body>
+</html>
+```html
+<!-- templates/dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - {{ project.name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+</head>
+<body data-project-id="{{ project_id }}">
+    <header class="navbar">
+        <a href="{{ url_for('projects') }}" class="logo">{{ project.name }}</a>
+        <div class="nav-buttons">
+            <span class="nav-user-name">Welcome, {{ user_name }}!</span>
+            <button id="manage-members-btn" class="btn">Manage Members</button>
+            <a href="{{ url_for('logout') }}" class="btn">Logout</a>
+        </div>
+    </header>
+    <main class="container">
+        <div class="kanban-board">
+            <div class="kanban-column">
+                <h2>To Do</h2>
+                <div id="todo-tasks" class="task-cards"></div>
+            </div>
+            <div class="kanban-column">
+                <h2>In Progress</h2>
+                <div id="inprogress-tasks" class="task-cards"></div>
+            </div>
+            <div class="kanban-column">
+                <h2>Done</h2>
+                <div id="done-tasks" class="task-cards"></div>
+            </div>
+        </div>
+    </main>
+    <button id="add-task-btn" class="btn fab">+</button>
+    <div id="add-task-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Add New Task</h2>
+            <form id="add-task-form">
+                <textarea id="task-content" placeholder="Task description..." required></textarea>
+                <select id="task-priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <input type="date" id="task-due-date">
+                <select id="task-assignee" class="assignee-dropdown"></select>
+                <button type="submit" class="btn">Add Task</button>
+            </form>
+        </div>
+    </div>
+    <div id="members-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Manage Members</h2>
+            <ul id="member-list" class="members-list"></ul>
+            <form id="add-member-form">
+                <input type="email" id="member-email" placeholder="Enter member's email" required>
+                <button type="submit" class="btn">Invite</button>
+            </form>
+        </div>
+    </div>
+    <div id="task-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Task Details</h2>
+            <form id="edit-task-form">
+                 <input type="hidden" id="edit-task-id">
+                <textarea id="edit-task-content" required></textarea>
+                <select id="edit-task-priority">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <input type="date" id="edit-task-due-date">
+                <select id="edit-task-assignee" class="assignee-dropdown"></select>
+                <button type="submit" class="btn">Save Changes</button>
+            </form>
+            <button id="delete-task-btn" class="btn">Delete Task</button>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
+```javascript
+// static/js/dashboard.js
+document.addEventListener('DOMContentLoaded', function() {
+    const projectId = document.body.dataset.projectId;
+    let members = [];
+    let allTasks = {};
+
+    if (!projectId || projectId === 'undefined' || projectId === null) {
+        return;
+    }
+
+    initializeApp();
+
+    function initializeApp() {
+        fetchMembers().then(() => {
+            fetchTasks();
+        });
+        initializeSortable();
+        setupEventListeners();
+    }
+
+    function initializeSortable() {
+        if (typeof Sortable === 'undefined') {
+            return;
+        }
+        const columns = document.querySelectorAll('.task-cards');
+        columns.forEach(column => {
+            new Sortable(column, {
+                group: 'tasks',
+                animation: 150,
+                onEnd: function(evt) {
+                    const taskId = evt.item.dataset.taskId;
+                    const newStatus = evt.to.id.replace('-tasks', '');
+                    updateTaskStatus(taskId, newStatus);
+                }
+            });
+        });
+    }
+
+    function setupEventListeners() {
+        const addTaskBtn = document.getElementById('add-task-btn');
+        const manageMembersBtn = document.getElementById('manage-members-btn');
+        const addTaskModal = document.getElementById('add-task-modal');
+        const membersModal = document.getElementById('members-modal');
+
+        if (addTaskBtn) addTaskBtn.onclick = () => addTaskModal.style.display = 'block';
+        if (manageMembersBtn) manageMembersBtn.onclick = () => membersModal.style.display = 'block';
+
+        document.querySelectorAll('.close-button').forEach(button => {
+            button.onclick = () => button.closest('.modal').style.display = 'none';
+        });
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        };
+
+        document.getElementById('add-task-form').addEventListener('submit', addTask);
+        document.getElementById('add-member-form').addEventListener('submit', addMember);
+        document.getElementById('edit-task-form').addEventListener('submit', saveTaskDetails);
+    }
+
+    async function fetchTasks() {
+        const response = await fetch(`/projects/${projectId}/tasks`);
+        const data = await response.json();
+        allTasks = {};
+        Object.values(data).flat().forEach(task => {
+            allTasks[task.id] = task;
+        });
+        renderTasks(data);
+    }
+
+    async function fetchMembers() {
+        const response = await fetch(`/projects/${projectId}/members`);
+        members = await response.json();
+        populateAssigneeDropdowns();
+        renderMembers();
+    }
+
+    function renderTasks(tasksByStatus) {
+        const columns = {
+            todo: document.getElementById('todo-tasks'),
+            inprogress: document.getElementById('inprogress-tasks'),
+            done: document.getElementById('done-tasks')
+        };
+        Object.values(columns).forEach(col => col.innerHTML = '');
+
+        for (const status in tasksByStatus) {
+            if (columns[status]) {
+                tasksByStatus[status].forEach(task => {
+                    const taskCard = createTaskCard(task);
+                    columns[status].appendChild(taskCard);
+                });
+            }
+        }
+    }
+
+    function createTaskCard(task) {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.taskId = task.id;
+        card.innerHTML = `
+            <p>${escapeHTML(task.content)}</p>
+            <div class="task-card-footer">
+                <span class="priority ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
+                <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
+            </div>
+        `;
+        card.addEventListener('click', () => openTaskDetails(task.id));
+        return card;
+    }
+
+    async function addTask(event) {
+        event.preventDefault();
+        const form = event.target;
+        await fetch(`/projects/${projectId}/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: form.querySelector('#task-content').value,
+                priority: form.querySelector('#task-priority').value,
+                due_date: form.querySelector('#task-due-date').value || null,
+                assignee_id: form.querySelector('#task-assignee').value || null
+            })
+        });
+        form.closest('.modal').style.display = 'none';
+        form.reset();
+        await fetchTasks();
+    }
+
+    function openTaskDetails(taskId) {
+        const task = allTasks[taskId];
+        if (!task) return;
+        const modal = document.getElementById('task-details-modal');
+        const form = document.getElementById('edit-task-form');
+        form.querySelector('#edit-task-id').value = task.id;
+        form.querySelector('#edit-task-content').value = task.content;
+        form.querySelector('#edit-task-priority').value = task.priority || 'medium';
+        form.querySelector('#edit-task-due-date').value = task.due_date || '';
+        form.querySelector('#edit-task-assignee').value = task.assignee_id || '';
+        document.getElementById('delete-task-btn').onclick = () => deleteTask(task.id);
+        modal.style.display = 'block';
+    }
+
+    async function saveTaskDetails(event) {
+        event.preventDefault();
+        const form = event.target;
+        const taskId = form.querySelector('#edit-task-id').value;
+        await fetch(`/projects/${projectId}/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: form.querySelector('#edit-task-content').value,
+                priority: form.querySelector('#edit-task-priority').value,
+                due_date: form.querySelector('#edit-task-due-date').value || null,
+                assignee_id: form.querySelector('#edit-task-assignee').value || null
+            })
+        });
+        form.closest('.modal').style.display = 'none';
+        await fetchTasks();
+    }
+
+    async function updateTaskStatus(taskId, newStatus) {
+        await fetch(`/projects/${projectId}/tasks/${taskId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        if(allTasks[taskId]) allTasks[taskId].status = newStatus;
+    }
+
+    async function deleteTask(taskId) {
+        if (!confirm('Are you sure you want to delete this task?')) return;
+        await fetch(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
+        document.getElementById('task-details-modal').style.display = 'none';
+        await fetchTasks(); 
+    }
+
+    function renderMembers() {
+        const memberList = document.getElementById('member-list');
+        memberList.innerHTML = '';
+        members.forEach(member => {
+            const li = document.createElement('li');
+            li.className = 'member-item';
+            li.innerHTML = `<span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span> <span class="member-role">${member.role}</span>`;
+            memberList.appendChild(li);
+        });
+    }
+
+    async function addMember(event) {
+        event.preventDefault();
+        const email = document.getElementById('member-email').value;
+        const response = await fetch(`/projects/${projectId}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            document.getElementById('add-member-form').reset();
+            await fetchMembers();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    }
+    
+    function populateAssigneeDropdowns() {
+        const dropdowns = document.querySelectorAll('.assignee-dropdown');
+        dropdowns.forEach(dropdown => {
+            const currentValue = dropdown.value;
+            dropdown.innerHTML = '<option value="">Unassigned</option>';
+            members.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.user_id;
+                option.textContent = escapeHTML(member.name);
+                dropdown.appendChild(option);
+            });
+            dropdown.value = currentValue;
+        });
+    }
+
+    function escapeHTML(str) {
+        if (str === null || str === undefined) return '';
+        const p = document.createElement('p');
+        p.textContent = str;
+        return p.innerHTML;
+    }
+});

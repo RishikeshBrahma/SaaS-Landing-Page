@@ -1,0 +1,66 @@
+# render.yaml
+services:
+  # This is your main web application
+  - type: web
+    name: saas-project-manager
+    env: python
+    # This command installs the dependencies from your requirements.txt
+    buildCommand: "pip install -r requirements.txt"
+    # This command starts your application using the Gunicorn server
+    startCommand: "gunicorn app:app"
+    envVars:
+      # Render will automatically generate a secure secret key
+      - key: SECRET_KEY
+        generateValue: true
+      # The following variables link your app to the database service below
+      - key: MYSQL_HOST
+        fromDatabase:
+          name: saas-mysql-db
+          property: host
+      - key: MYSQL_USER
+        fromDatabase:
+          name: saas-mysql-db
+          property: user
+      - key: MYSQL_PASSWORD
+        fromDatabase:
+          name: saas-mysql-db
+          property: password
+      - key: MYSQL_DB
+        fromDatabase:
+          name: saas-mysql-db
+          property: database
+      # Important for Flask to know it's in a production environment
+      - key: PYTHON_VERSION
+        value: 3.11 # Or your preferred Python version
+
+  # This defines your MySQL database
+  - type: pserv
+    name: saas-mysql-db
+    # Using MySQL 8
+    image:
+      url: mysql:8
+    # The 'free' plan is great for getting started
+    plan: free
+    envVars:
+      - key: MYSQL_DATABASE
+        fromService:
+          type: web
+          name: saas-project-manager
+          envVarKey: MYSQL_DB
+      - key: MYSQL_USER
+        fromService:
+          type: web
+          name: saas-project-manager
+          envVarKey: MYSQL_USER
+      - key: MYSQL_PASSWORD
+        fromService:
+          type: web
+          name: saas-project-manager
+          envVarKey: MYSQL_PASSWORD
+      # You need to set a root password for the database
+      - key: Rishi@2006
+        generateValue: true
+    disk:
+      name: mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 1

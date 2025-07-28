@@ -15,15 +15,15 @@ bcrypt = Bcrypt(app)
 # Database Connection Pool
 db_pool = None
 try:
- db_pool = mysql.connector.pooling.MySQLConnectionPool(
-    pool_name="saas_pool",
-    pool_size=5,
-    host=app.config['MYSQL_HOST'],
-    port=os.environ.get('MYSQL_PORT'),  # <-- Add this line for the port
-    user=app.config['MYSQL_USER'],
-    password=app.config['MYSQL_PASSWORD'],
-    database=app.config['MYSQL_DB'],
-)
+    db_pool = mysql.connector.pooling.MySQLConnectionPool(
+        pool_name="saas_pool",
+        pool_size=5,
+        host=app.config['MYSQL_HOST'],
+        port=os.environ.get('MYSQL_PORT'),
+        user=app.config['MYSQL_USER'],
+        password=app.config['MYSQL_PASSWORD'],
+        database=app.config['MYSQL_DB']
+    )
     print("--- Database connection pool created successfully. ---")
 except Exception as e:
     print(f"---!!! FAILED TO CREATE DATABASE CONNECTION POOL: {e} !!!---", file=sys.stderr)

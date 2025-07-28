@@ -1,4 +1,5 @@
 Flask
 mysql-connector-python
 Flask-Bcrypt
-gunicorn
+Flask-MySQLdb
+Flask-Session

@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetchMembers().then(fetchTasks);
         initializeSortable();
         setupEventListeners();
+        updateTaskCounts();
     }
 
     function initializeSortable() {
@@ -20,8 +21,15 @@ document.addEventListener('DOMContentLoaded', function() {
         columns.forEach(column => {
             new Sortable(column, {
                 group: 'tasks',
-                animation: 150,
+                animation: 300,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+                onStart: function(evt) {
+                    evt.item.classList.add('dragging');
+                },
                 onEnd: function(evt) {
+                    evt.item.classList.remove('dragging');
                     const taskId = evt.item.dataset.taskId;
                     const newStatus = evt.to.id.replace('-tasks', '');
                     updateTaskStatus(taskId, newStatus);
@@ -35,12 +43,17 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('manage-members-btn').onclick = () => showModal('members-modal');
 
         document.querySelectorAll('.close-btn').forEach(button => {
-            button.onclick = () => button.closest('.modal').style.display = 'none';
+            button.onclick = () => {
+                button.closest('.modal').style.display = 'none';
+                // Clear form data when closing modals
+                clearModalForms();
+            };
         });
 
         window.onclick = (event) => {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
+                clearModalForms();
             }
         };
 
@@ -51,8 +64,30 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('add-comment-form').addEventListener('submit', addComment);
     }
 
+    function clearModalForms() {
+        // Reset all forms
+        document.querySelectorAll('form').forEach(form => {
+            if (form.id !== 'edit-task-form') { // Don't clear edit form as it might be in use
+                form.reset();
+            }
+        });
+    }
+
     function showModal(modalId) {
-        document.getElementById(modalId).style.display = 'block';
+        const modal = document.getElementById(modalId);
+        modal.style.display = 'block';
+        // Add entrance animation
+        modal.querySelector('.modal-content').style.animation = 'scaleIn 0.3s ease-out';
+    }
+
+    function updateTaskCounts() {
+        const todoCounts = document.querySelectorAll('#todo-tasks .task-card').length;
+        const inProgressCounts = document.querySelectorAll('#inprogress-tasks .task-card').length;
+        const doneCounts = document.querySelectorAll('#done-tasks .task-card').length;
+
+        document.getElementById('todo-count').textContent = todoCounts;
+        document.getElementById('inprogress-count').textContent = inProgressCounts;
+        document.getElementById('done-count').textContent = doneCounts;
     }
 
     // --- Task Functions ---
@@ -68,8 +103,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             renderTasks(data);
+            updateTaskCounts();
         } catch (error) {
             console.error('Error fetching tasks:', error);
+            showNotification('Error loading tasks', 'error');
         }
     }
 
@@ -83,25 +120,30 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear all columns first
         Object.values(columns).forEach(col => col.innerHTML = '');
         
-        // Render tasks in their respective columns
+        // Render tasks in their respective columns with staggered animation
         for (const status in tasksByStatus) {
             if (columns[status]) {
-                tasksByStatus[status].forEach(task => {
-                    columns[status].appendChild(createTaskCard(task));
+                tasksByStatus[status].forEach((task, index) => {
+                    const taskCard = createTaskCard(task);
+                    taskCard.style.animationDelay = `${index * 0.1}s`;
+                    columns[status].appendChild(taskCard);
                 });
             }
         }
     }
 
-    // ENHANCED: Task card now shows actual subtasks and comments with authors
+    // ENHANCED: Task card now shows detailed subtasks and comments with authors
     function createTaskCard(task) {
         const card = document.createElement('div');
         card.className = 'task-card';
         card.dataset.taskId = task.id;
 
-        // Build subtasks section
+        // Build subtasks section with author information
         let subtasksHTML = '';
         if (task.subtasks && task.subtasks.length > 0) {
+            const completedCount = task.subtasks.filter(st => st.is_complete).length;
+            const totalCount = task.subtasks.length;
+            
             subtasksHTML = `
                 <div class="card-subtasks">
                     <div class="card-section-header">
@@ -109,23 +151,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             <path d="M9 12l2 2 4-4"/>
                             <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
                         </svg>
-                        Subtasks (${task.subtasks.filter(st => st.is_complete).length}/${task.subtasks.length})
+                        Subtasks (${completedCount}/${totalCount})
                     </div>
                     <div class="card-subtask-list">
                         ${task.subtasks.slice(0, 3).map(subtask => `
                             <div class="card-subtask-item ${subtask.is_complete ? 'completed' : ''}">
                                 <span class="subtask-checkbox">${subtask.is_complete ? '✓' : '○'}</span>
                                 <span class="subtask-text">${escapeHTML(subtask.content)}</span>
-                                <span class="subtask-author">by ${escapeHTML(subtask.created_by || 'Unknown')}</span>
+                                <span class="subtask-author">by ${escapeHTML(getSubtaskAuthor(subtask))}</span>
                             </div>
                         `).join('')}
-                        ${task.subtasks.length > 3 ? `<div class="card-more">+${task.subtasks.length - 3} more...</div>` : ''}
+                        ${task.subtasks.length > 3 ? `<div class="card-more">+${task.subtasks.length - 3} more subtasks...</div>` : ''}
                     </div>
                 </div>
             `;
         }
 
-        // Build comments section (we'll need to fetch comments separately for author info)
+        // Build comments section with real comment data
         let commentsHTML = '';
         const commentCount = task.comment_count || 0;
         if (commentCount > 0) {
@@ -138,8 +180,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         Comments (${commentCount})
                     </div>
                     <div class="card-comment-preview" data-task-id="${task.id}">
-                        Loading comments...
+                        <div style="opacity: 0.6; font-style: italic;">Loading comments...</div>
                     </div>
+                </div>
+            `;
+        }
+
+        // Build due date info
+        let dueDateHTML = '';
+        if (task.due_date) {
+            const dueDate = new Date(task.due_date);
+            const today = new Date();
+            const isOverdue = dueDate < today;
+            dueDateHTML = `
+                <div class="task-due-date ${isOverdue ? 'overdue' : ''}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    ${task.due_date}
                 </div>
             `;
         }
@@ -147,14 +208,17 @@ document.addEventListener('DOMContentLoaded', function() {
         card.innerHTML = `
             <div class="task-content">
                 <p class="task-title">${escapeHTML(task.content)}</p>
+                ${dueDateHTML}
             </div>
             
             ${subtasksHTML}
             ${commentsHTML}
             
             <div class="task-card-footer">
-                <span class="priority ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
-                <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
+                <div class="task-meta">
+                    <span class="priority ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
+                </div>
+                <div class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</div>
             </div>`;
         
         // Load comments for this card if they exist
@@ -163,10 +227,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         card.addEventListener('click', () => openTaskDetails(task.id));
+        
+        // Add hover effects
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'translateY(-5px) scale(1.02)';
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            if (!card.classList.contains('dragging')) {
+                card.style.transform = '';
+            }
+        });
+        
         return card;
     }
 
-    // NEW: Function to load comments for display on cards
+    function getSubtaskAuthor(subtask) {
+        // Find the member who created this subtask
+        const author = members.find(member => member.user_id === subtask.created_by);
+        return author ? author.name : 'Unknown';
+    }
+
+    // NEW: Function to load comments for display on cards with author info
     async function loadCardComments(taskId) {
         try {
             const response = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`);
@@ -179,9 +261,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     previewElement.innerHTML = recentComments.map(comment => `
                         <div class="card-comment-item">
                             <span class="comment-author">${escapeHTML(comment.author)}:</span>
-                            <span class="comment-text">${escapeHTML(comment.content.substring(0, 50))}${comment.content.length > 50 ? '...' : ''}</span>
+                            <span class="comment-text">${escapeHTML(comment.content.substring(0, 60))}${comment.content.length > 60 ? '...' : ''}</span>
                         </div>
-                    `).join('') + (comments.length > 2 ? `<div class="card-more">+${comments.length - 2} more...</div>` : '');
+                    `).join('') + (comments.length > 2 ? `<div class="card-more">+${comments.length - 2} more comments...</div>` : '');
                 }
             }
         } catch (error) {
@@ -209,17 +291,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.closest('.modal').style.display = 'none';
                 form.reset();
                 await fetchTasks();
+                showNotification('Task added successfully!', 'success');
+            } else {
+                throw new Error('Failed to add task');
             }
         } catch (error) {
             console.error('Error adding task:', error);
+            showNotification('Error adding task', 'error');
         }
     }
     
-    // CRITICAL FIX: Completely clear modal data and fetch fresh data for the specific task
+    // ENHANCED: Task details modal with better animations and user experience
     async function openTaskDetails(taskId) {
         currentTaskId = taskId;
         const task = allTasks[taskId];
         if (!task) return;
+
+        // Show loading state
+        showModal('task-details-modal');
+        const modal = document.getElementById('task-details-modal');
+        modal.querySelector('.modal-content').innerHTML = `
+            <span class="close-btn">&times;</span>
+            <div style="text-align: center; padding: 2rem;">
+                <div style="opacity: 0.6;">Loading task details...</div>
+            </div>
+        `;
 
         // **STEP 1: Clear ALL previous data first**
         clearTaskModal();
@@ -233,23 +329,95 @@ document.addEventListener('DOMContentLoaded', function() {
             fetchAndRenderComments(taskId)
         ]);
         
-        showModal('task-details-modal');
+        // Re-setup event listeners for the new modal content
+        setupModalEventListeners();
+    }
+
+    function setupModalEventListeners() {
+        const closeBtn = document.querySelector('#task-details-modal .close-btn');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                document.getElementById('task-details-modal').style.display = 'none';
+                clearModalForms();
+            };
+        }
     }
 
     // NEW: Function to completely clear modal data
     function clearTaskModal() {
-        // Clear lists
-        document.getElementById('subtask-list').innerHTML = '';
-        document.getElementById('comment-list').innerHTML = '';
+        const modal = document.getElementById('task-details-modal');
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2>Task Details</h2>
+                <form id="edit-task-form">
+                    <input type="hidden" id="edit-task-id">
+                    
+                    <label for="edit-task-content">Task Description</label>
+                    <textarea id="edit-task-content" required></textarea>
+                    
+                    <label for="edit-task-priority">Priority</label>
+                    <select id="edit-task-priority">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    
+                    <label for="edit-task-due-date">Due Date</label>
+                    <input type="date" id="edit-task-due-date">
+                    
+                    <label for="edit-task-assignee">Assignee</label>
+                    <select id="edit-task-assignee" class="assignee-dropdown">
+                        <option value="">Unassigned</option>
+                    </select>
+                    
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+                
+                <div class="subtask-container">
+                    <h4>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 12l2 2 4-4"/>
+                            <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 9 4.03 9 9z"/>
+                        </svg>
+                        Subtasks
+                    </h4>
+                    <ul id="subtask-list" class="subtask-list"></ul>
+                    <form id="add-subtask-form">
+                        <input type="text" id="subtask-content" placeholder="Add a new subtask..." required>
+                        <button type="submit" class="btn btn-secondary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="comment-container">
+                    <h4>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Comments
+                    </h4>
+                    <ul id="comment-list" class="comment-list"></ul>
+                    <form id="add-comment-form">
+                        <textarea id="comment-content" placeholder="Write a comment..." required></textarea>
+                        <button type="submit" class="btn btn-primary">Add Comment</button>
+                    </form>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="delete-task-btn" class="btn btn-danger">Delete Task</button>
+                </div>
+            </div>
+        `;
         
-        // Reset forms
-        document.getElementById('add-subtask-form').reset();
-        document.getElementById('add-comment-form').reset();
-        
-        // Clear any existing event listeners by cloning nodes
-        const subtaskList = document.getElementById('subtask-list');
-        const newSubtaskList = subtaskList.cloneNode(true);
-        subtaskList.parentNode.replaceChild(newSubtaskList, subtaskList);
+        // Re-setup form event listeners
+        document.getElementById('edit-task-form').addEventListener('submit', saveTaskDetails);
+        document.getElementById('add-subtask-form').addEventListener('submit', addSubtask);
+        document.getElementById('add-comment-form').addEventListener('submit', addComment);
     }
 
     // NEW: Function to populate task form
@@ -260,6 +428,9 @@ document.addEventListener('DOMContentLoaded', function() {
         form.querySelector('#edit-task-priority').value = task.priority || 'medium';
         form.querySelector('#edit-task-due-date').value = task.due_date ? task.due_date.split(' ')[0] : '';
         form.querySelector('#edit-task-assignee').value = task.assignee_id || '';
+        
+        // Populate assignee dropdown
+        populateAssigneeDropdowns();
         
         // Set delete button handler
         document.getElementById('delete-task-btn').onclick = () => deleteTask(task.id);
@@ -285,9 +456,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 form.closest('.modal').style.display = 'none';
                 await fetchTasks(); // Refresh tasks to show updated content
+                showNotification('Task updated successfully!', 'success');
+            } else {
+                throw new Error('Failed to update task');
             }
         } catch (error) {
             console.error('Error saving task:', error);
+            showNotification('Error updating task', 'error');
         }
     }
 
@@ -301,14 +476,17 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (response.ok && allTasks[taskId]) {
                 allTasks[taskId].status = newStatus;
+                updateTaskCounts();
+                showNotification('Task moved successfully!', 'success');
             }
         } catch (error) {
             console.error('Error updating task status:', error);
+            showNotification('Error moving task', 'error');
         }
     }
 
     async function deleteTask(taskId) {
-        if (!confirm('Are you sure you want to delete this task?')) return;
+        if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) return;
         
         try {
             const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, { 
@@ -318,9 +496,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 document.getElementById('task-details-modal').style.display = 'none';
                 await fetchTasks(); 
+                showNotification('Task deleted successfully!', 'success');
+            } else {
+                throw new Error('Failed to delete task');
             }
         } catch (error) {
             console.error('Error deleting task:', error);
+            showNotification('Error deleting task', 'error');
         }
     }
 
@@ -333,16 +515,21 @@ document.addEventListener('DOMContentLoaded', function() {
             renderMembers();
         } catch (error) {
             console.error('Error fetching members:', error);
+            showNotification('Error loading team members', 'error');
         }
     }
 
     function renderMembers() {
         const memberList = document.getElementById('member-list');
         memberList.innerHTML = '';
-        members.forEach(member => {
+        members.forEach((member, index) => {
             const li = document.createElement('li');
             li.className = 'member-item';
-            li.innerHTML = `<span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span> <span class="member-role">${member.role}</span>`;
+            li.style.animationDelay = `${index * 0.1}s`;
+            li.innerHTML = `
+                <span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span> 
+                <span class="member-role">${member.role}</span>
+            `;
             memberList.appendChild(li);
         });
     }
@@ -363,11 +550,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 form.reset();
                 await fetchMembers();
+                showNotification('Member added successfully!', 'success');
             } else {
-                alert(`Error: ${data.error}`);
+                showNotification(`Error: ${data.error}`, 'error');
             }
         } catch (error) {
             console.error('Error adding member:', error);
+            showNotification('Error adding member', 'error');
         }
     }
     
@@ -386,7 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- FIXED Subtask Functions ---
+    // --- ENHANCED Subtask Functions ---
     async function fetchAndRenderSubtasks(taskId) {
         try {
             // Get the specific task's subtasks from our stored data
@@ -403,6 +592,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error fetching subtasks:', error);
+            showNotification('Error loading subtasks', 'error');
         }
     }
 
@@ -412,18 +602,29 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!subtasks || !Array.isArray(subtasks)) return;
         
-        subtasks.forEach(subtask => {
+        subtasks.forEach((subtask, index) => {
             const li = document.createElement('li');
             li.className = `subtask-item ${subtask.is_complete ? 'completed' : ''}`;
+            li.style.animationDelay = `${index * 0.1}s`;
+            
+            // Find the author of this subtask
+            const author = members.find(member => member.user_id === subtask.created_by);
+            const authorName = author ? author.name : 'Unknown';
+            
             li.innerHTML = `
                 <input type="checkbox" data-subtask-id="${subtask.id}" ${subtask.is_complete ? 'checked' : ''}>
                 <span>${escapeHTML(subtask.content)}</span>
+                <small style="color: var(--text-muted); font-style: italic; margin-left: auto;">by ${escapeHTML(authorName)}</small>
             `;
             
             // Add event listener for this specific checkbox
             const checkbox = li.querySelector('input[type="checkbox"]');
             checkbox.addEventListener('change', (e) => {
                 updateSubtaskStatus(subtask.id, e.target.checked);
+                // Add visual feedback
+                if (e.target.checked) {
+                    li.style.animation = 'pulse 0.3s ease-in-out';
+                }
             });
             
             subtaskList.appendChild(li);
@@ -452,11 +653,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Refresh the main tasks data first, then update subtasks display
                 await fetchTasks();
                 await fetchAndRenderSubtasks(currentTaskId);
+                showNotification('Subtask added successfully!', 'success');
             } else {
-                alert('Failed to add subtask.');
+                throw new Error('Failed to add subtask');
             }
         } catch (error) {
             console.error('Error adding subtask:', error);
+            showNotification('Error adding subtask', 'error');
         }
     }
 
@@ -479,13 +682,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 // Refresh main board to update counts
                 await fetchTasks();
+                showNotification(`Subtask ${isComplete ? 'completed' : 'reopened'}!`, 'success');
             }
         } catch (error) {
             console.error('Error updating subtask:', error);
+            showNotification('Error updating subtask', 'error');
         }
     }
     
-    // --- FIXED Comment Functions ---
+    // --- ENHANCED Comment Functions ---
     async function fetchAndRenderComments(taskId) {
         try {
             const response = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`);
@@ -495,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error fetching comments:', error);
+            showNotification('Error loading comments', 'error');
         }
     }
     
@@ -504,9 +710,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!comments || !Array.isArray(comments)) return;
         
-        comments.forEach(comment => {
+        comments.forEach((comment, index) => {
             const li = document.createElement('li');
             li.className = 'comment-item';
+            li.style.animationDelay = `${index * 0.1}s`;
             li.innerHTML = `
                 <div class="comment-header">
                     <span class="comment-author">${escapeHTML(comment.author)}</span>
@@ -516,6 +723,11 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             commentList.appendChild(li);
         });
+        
+        // Scroll to bottom to show latest comments
+        setTimeout(() => {
+            commentList.scrollTop = commentList.scrollHeight;
+        }, 100);
     }
 
     async function addComment(event) {
@@ -539,18 +751,158 @@ document.addEventListener('DOMContentLoaded', function() {
                     fetchAndRenderComments(currentTaskId),
                     fetchTasks() // This updates comment counts on cards
                 ]);
+                showNotification('Comment added successfully!', 'success');
             } else {
-                alert('Failed to add comment.');
+                throw new Error('Failed to add comment');
             }
         } catch (error) {
             console.error('Error adding comment:', error);
+            showNotification('Error adding comment', 'error');
         }
     }
 
+    // --- Utility Functions ---
     function escapeHTML(str) {
         if (str === null || str === undefined) return '';
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
     }
+
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span>${message}</span>
+                <button class="notification-close">&times;</button>
+            </div>
+        `;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Style the notification
+        Object.assign(notification.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            padding: '1rem 1.5rem',
+            borderRadius: 'var(--border-radius)',
+            boxShadow: 'var(--shadow-lg)',
+            zIndex: '9999',
+            maxWidth: '400px',
+            animation: 'slideInFromRight 0.3s ease-out',
+            backgroundColor: getNotificationColor(type),
+            color: 'white',
+            fontWeight: '500'
+        });
+        
+        // Add close functionality
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.onclick = () => removeNotification(notification);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => removeNotification(notification), 5000);
+    }
+
+    function getNotificationColor(type) {
+        const colors = {
+            success: '#4facfe',
+            error: '#ff416c',
+            warning: '#ffa726',
+            info: '#667eea'
+        };
+        return colors[type] || colors.info;
+    }
+
+    function removeNotification(notification) {
+        notification.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }
+
+    // Add some CSS for notifications
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideInFromRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+        
+        .notification-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .notification-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .notification-close:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .task-due-date {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+        
+        .task-due-date.overdue {
+            color: #e53e3e;
+        }
+        
+        .sortable-ghost {
+            opacity: 0.4;
+        }
+        
+        .sortable-chosen {
+            transform: rotate(5deg);
+        }
+        
+        .sortable-drag {
+            transform: rotate(5deg);
+            box-shadow: var(--shadow-xl);
+        }
+    `;
+    document.head.appendChild(style);
 });

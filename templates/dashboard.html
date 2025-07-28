@@ -23,38 +23,64 @@
     </header>
 
     <main class="container">
-        <div class="kanban-board">
-            <div class="kanban-column">
-                <h3>To Do</h3>
-                <div id="todo-tasks" class="task-cards"></div>
-            </div>
-            <div class="kanban-column">
-                <h3>In Progress</h3>
-                <div id="inprogress-tasks" class="task-cards"></div>
-            </div>
-            <div class="kanban-column">
-                <h3>Done</h3>
-                <div id="done-tasks" class="task-cards"></div>
+        <div class="kanban-board-wrapper">
+            <div class="kanban-board">
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <h3>To Do</h3>
+                        <span class="task-count" id="todo-count">0</span>
+                    </div>
+                    <div id="todo-tasks" class="task-cards"></div>
+                </div>
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <h3>In Progress</h3>
+                        <span class="task-count" id="inprogress-count">0</span>
+                    </div>
+                    <div id="inprogress-tasks" class="task-cards"></div>
+                </div>
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <h3>Done</h3>
+                        <span class="task-count" id="done-count">0</span>
+                    </div>
+                    <div id="done-tasks" class="task-cards"></div>
+                </div>
             </div>
         </div>
     </main>
 
-    <button id="add-task-btn" class="fab btn-primary">+</button>
+    <button id="add-task-btn" class="fab btn-primary">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
 
     <div id="add-task-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
             <h2>Add New Task</h2>
             <form id="add-task-form">
+                <label for="task-content">Task Description</label>
                 <textarea id="task-content" placeholder="Task description..." required></textarea>
+                
+                <label for="task-priority">Priority</label>
                 <select id="task-priority">
                     <option value="low">Low</option>
                     <option value="medium" selected>Medium</option>
                     <option value="high">High</option>
                 </select>
+                
+                <label for="task-due-date">Due Date</label>
                 <input type="date" id="task-due-date">
-                <select id="task-assignee" class="assignee-dropdown"></select>
-                <button type="submit" class="btn">Add Task</button>
+                
+                <label for="task-assignee">Assignee</label>
+                <select id="task-assignee" class="assignee-dropdown">
+                    <option value="">Unassigned</option>
+                </select>
+                
+                <button type="submit" class="btn btn-primary">Add Task</button>
             </form>
         </div>
     </div>
@@ -65,8 +91,9 @@
             <h2>Manage Members</h2>
             <ul id="member-list" class="members-list"></ul>
             <form id="add-member-form">
+                <label for="member-email">Member Email</label>
                 <input type="email" id="member-email" placeholder="Enter member's email" required>
-                <button type="submit" class="btn">Invite Member</button>
+                <button type="submit" class="btn btn-primary">Invite Member</button>
             </form>
         </div>
     </div>
@@ -77,36 +104,65 @@
             <h2>Task Details</h2>
             <form id="edit-task-form">
                 <input type="hidden" id="edit-task-id">
+                
+                <label for="edit-task-content">Task Description</label>
                 <textarea id="edit-task-content" required></textarea>
+                
+                <label for="edit-task-priority">Priority</label>
                 <select id="edit-task-priority">
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
                 </select>
+                
+                <label for="edit-task-due-date">Due Date</label>
                 <input type="date" id="edit-task-due-date">
-                <select id="edit-task-assignee" class="assignee-dropdown"></select>
-                <button type="submit" class="btn">Save Changes</button>
+                
+                <label for="edit-task-assignee">Assignee</label>
+                <select id="edit-task-assignee" class="assignee-dropdown">
+                    <option value="">Unassigned</option>
+                </select>
+                
+                <button type="submit" class="btn btn-primary">Save Changes</button>
             </form>
             
             <div class="subtask-container">
-                <h4>Subtasks</h4>
+                <h4>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                    </svg>
+                    Subtasks
+                </h4>
                 <ul id="subtask-list" class="subtask-list"></ul>
                 <form id="add-subtask-form">
                     <input type="text" id="subtask-content" placeholder="Add a new subtask..." required>
-                    <button type="submit" class="btn btn-secondary">+</button>
+                    <button type="submit" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
                 </form>
             </div>
 
             <div class="comment-container">
-                <h4>Comments</h4>
+                <h4>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Comments
+                </h4>
                 <ul id="comment-list" class="comment-list"></ul>
                 <form id="add-comment-form">
                     <textarea id="comment-content" placeholder="Write a comment..." required></textarea>
-                    <button type="submit" class="btn">Comment</button>
+                    <button type="submit" class="btn btn-primary">Add Comment</button>
                 </form>
             </div>
             
-            <button id="delete-task-btn" class="btn btn-secondary">Delete Task</button>
+            <div class="modal-actions">
+                <button id="delete-task-btn" class="btn btn-danger">Delete Task</button>
+            </div>
         </div>
     </div>
 

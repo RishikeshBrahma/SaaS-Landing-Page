@@ -7,5 +7,5 @@ class Config:
     # Database configuration for local development
     MYSQL_HOST = 'localhost'
     MYSQL_USER = 'root'
-    MYSQL_PASSWORD = 'Rishi@2006'  # <-- Make sure this is your real password
+    MYSQL_PASSWORD = 'xxxxx'  # <-- Make sure this is your real password
     MYSQL_DB = 'saas_landing'

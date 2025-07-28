@@ -1,28 +1,21 @@
-// static/js/dashboard.js
-// This script handles the dashboard functionality including task management and member management.
 document.addEventListener('DOMContentLoaded', function() {
     const projectId = document.body.dataset.projectId;
     let members = [];
     let allTasks = {};
+    let currentTaskId = null;
 
-    if (!projectId || projectId === 'undefined' || projectId === null) {
-        return;
-    }
+    if (!projectId) return;
 
     initializeApp();
 
     function initializeApp() {
-        fetchMembers().then(() => {
-            fetchTasks();
-        });
+        fetchMembers().then(fetchTasks);
         initializeSortable();
         setupEventListeners();
     }
 
     function initializeSortable() {
-        if (typeof Sortable === 'undefined') {
-            return;
-        }
+        if (typeof Sortable === 'undefined') return;
         const columns = document.querySelectorAll('.task-cards');
         columns.forEach(column => {
             new Sortable(column, {
@@ -38,19 +31,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setupEventListeners() {
-        const addTaskBtn = document.getElementById('add-task-btn');
-        const manageMembersBtn = document.getElementById('manage-members-btn');
-        const addTaskModal = document.getElementById('add-task-modal');
-        const membersModal = document.getElementById('members-modal');
+        document.getElementById('add-task-btn').onclick = () => showModal('add-task-modal');
+        document.getElementById('manage-members-btn').onclick = () => showModal('members-modal');
 
-        if (addTaskBtn) addTaskBtn.onclick = () => addTaskModal.style.display = 'block';
-        if (manageMembersBtn) manageMembersBtn.onclick = () => membersModal.style.display = 'block';
-
-        document.querySelectorAll('.close-button').forEach(button => {
+        document.querySelectorAll('.close-btn').forEach(button => {
             button.onclick = () => button.closest('.modal').style.display = 'none';
         });
 
-        window.onclick = function(event) {
+        window.onclick = (event) => {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
@@ -59,23 +47,21 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('add-task-form').addEventListener('submit', addTask);
         document.getElementById('add-member-form').addEventListener('submit', addMember);
         document.getElementById('edit-task-form').addEventListener('submit', saveTaskDetails);
+        document.getElementById('add-subtask-form').addEventListener('submit', addSubtask);
+        document.getElementById('add-comment-form').addEventListener('submit', addComment);
     }
 
+    function showModal(modalId) {
+        document.getElementById(modalId).style.display = 'block';
+    }
+
+    // --- Task Functions ---
     async function fetchTasks() {
         const response = await fetch(`/projects/${projectId}/tasks`);
         const data = await response.json();
         allTasks = {};
-        Object.values(data).flat().forEach(task => {
-            allTasks[task.id] = task;
-        });
+        Object.values(data).flat().forEach(task => { allTasks[task.id] = task; });
         renderTasks(data);
-    }
-
-    async function fetchMembers() {
-        const response = await fetch(`/projects/${projectId}/members`);
-        members = await response.json();
-        populateAssigneeDropdowns();
-        renderMembers();
     }
 
     function renderTasks(tasksByStatus) {
@@ -85,35 +71,48 @@ document.addEventListener('DOMContentLoaded', function() {
             done: document.getElementById('done-tasks')
         };
         Object.values(columns).forEach(col => col.innerHTML = '');
-
         for (const status in tasksByStatus) {
             if (columns[status]) {
                 tasksByStatus[status].forEach(task => {
-                    const taskCard = createTaskCard(task);
-                    columns[status].appendChild(taskCard);
+                    columns[status].appendChild(createTaskCard(task));
                 });
             }
         }
     }
 
+    // ## MODIFIED: createTaskCard now shows subtask and comment counts ##
     function createTaskCard(task) {
         const card = document.createElement('div');
         card.className = 'task-card';
         card.dataset.taskId = task.id;
+
+        // Calculate counts
+        const subtaskCount = task.subtasks ? task.subtasks.length : 0;
+        const commentCount = task.comment_count || 0;
+
         card.innerHTML = `
             <p>${escapeHTML(task.content)}</p>
             <div class="task-card-footer">
                 <span class="priority ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
-                <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
-            </div>
-        `;
+                <div class="task-meta">
+                    <span class="task-meta-item">
+                        <svg_icon_for_subtask> ${subtaskCount}
+                    </span>
+                    <span class="task-meta-item">
+                        <svg_icon_for_comment> ${commentCount}
+                    </span>
+                    <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
+                </div>
+            </div>`;
         card.addEventListener('click', () => openTaskDetails(task.id));
         return card;
     }
 
+
     async function addTask(event) {
         event.preventDefault();
         const form = event.target;
+        // Logic to add task...
         await fetch(`/projects/${projectId}/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -128,19 +127,33 @@ document.addEventListener('DOMContentLoaded', function() {
         form.reset();
         await fetchTasks();
     }
-
-    function openTaskDetails(taskId) {
+    
+    // ## FIXED: Clears old data before opening a new task to prevent duplication ##
+    async function openTaskDetails(taskId) {
+        currentTaskId = taskId;
         const task = allTasks[taskId];
         if (!task) return;
+
+        // **CRITICAL FIX**: Clear previous task's data first
+        document.getElementById('subtask-list').innerHTML = '';
+        document.getElementById('comment-list').innerHTML = '';
+        document.getElementById('add-subtask-form').reset();
+        document.getElementById('add-comment-form').reset();
+
         const modal = document.getElementById('task-details-modal');
         const form = document.getElementById('edit-task-form');
         form.querySelector('#edit-task-id').value = task.id;
         form.querySelector('#edit-task-content').value = task.content;
         form.querySelector('#edit-task-priority').value = task.priority || 'medium';
-        form.querySelector('#edit-task-due-date').value = task.due_date || '';
+        form.querySelector('#edit-task-due-date').value = task.due_date ? task.due_date.split(' ')[0] : '';
         form.querySelector('#edit-task-assignee').value = task.assignee_id || '';
         document.getElementById('delete-task-btn').onclick = () => deleteTask(task.id);
-        modal.style.display = 'block';
+
+        // Fetch and render fresh data
+        await fetchAndRenderSubtasks(taskId);
+        await fetchAndRenderComments(taskId);
+        
+        showModal('task-details-modal');
     }
 
     async function saveTaskDetails(event) {
@@ -158,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
         });
         form.closest('.modal').style.display = 'none';
-        await fetchTasks();
+        await fetchTasks(); // Refresh tasks to show updated content
     }
 
     async function updateTaskStatus(taskId, newStatus) {
@@ -167,7 +180,10 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus })
         });
-        if(allTasks[taskId]) allTasks[taskId].status = newStatus;
+        // Update local task object and re-render
+        if(allTasks[taskId]) {
+            allTasks[taskId].status = newStatus;
+        }
     }
 
     async function deleteTask(taskId) {
@@ -175,6 +191,14 @@ document.addEventListener('DOMContentLoaded', function() {
         await fetch(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
         document.getElementById('task-details-modal').style.display = 'none';
         await fetchTasks(); 
+    }
+
+    // --- Member Functions ---
+    async function fetchMembers() {
+        const response = await fetch(`/projects/${projectId}/members`);
+        members = await response.json();
+        populateAssigneeDropdowns();
+        renderMembers();
     }
 
     function renderMembers() {
@@ -190,15 +214,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function addMember(event) {
         event.preventDefault();
-        const email = document.getElementById('member-email').value;
+        const form = event.target;
+        const email = form.querySelector('#member-email').value;
         const response = await fetch(`/projects/${projectId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
         });
         const data = await response.json();
-        if (data.status === 'success') {
-            document.getElementById('add-member-form').reset();
+        if (response.ok) {
+            form.reset();
             await fetchMembers();
         } else {
             alert(`Error: ${data.error}`);
@@ -218,6 +243,110 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             dropdown.value = currentValue;
         });
+    }
+
+    // --- Subtask Functions ---
+    async function fetchAndRenderSubtasks(taskId) {
+        const response = await fetch(`/projects/${projectId}/tasks`); // Re-fetch all tasks to get latest subtasks
+        const data = await response.json();
+        allTasks = {};
+        Object.values(data).flat().forEach(task => { allTasks[task.id] = task; });
+        const task = allTasks[taskId];
+        renderSubtasks(task.subtasks || []);
+    }
+
+    function renderSubtasks(subtasks) {
+        const subtaskList = document.getElementById('subtask-list');
+        subtaskList.innerHTML = ''; // Ensure list is clear before rendering
+        if (!subtasks) return;
+        subtasks.forEach(subtask => {
+            const li = document.createElement('li');
+            li.className = `subtask-item ${subtask.is_complete ? 'completed' : ''}`;
+            li.innerHTML = `
+                <input type="checkbox" data-subtask-id="${subtask.id}" ${subtask.is_complete ? 'checked' : ''}>
+                <span>${escapeHTML(subtask.content)}</span>
+            `;
+            li.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+                updateSubtaskStatus(subtask.id, e.target.checked);
+            });
+            subtaskList.appendChild(li);
+        });
+    }
+    
+    async function addSubtask(event) {
+        event.preventDefault();
+        const form = event.target;
+        const content = form.querySelector('#subtask-content').value;
+        if (!content.trim() || !currentTaskId) return;
+
+        const response = await fetch(`/projects/${projectId}/subtasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content, task_id: currentTaskId })
+        });
+
+        if (response.ok) {
+            form.reset();
+            await fetchAndRenderSubtasks(currentTaskId);
+            await fetchTasks(); // Refresh main board to update count
+        } else {
+            alert('Failed to add subtask.');
+        }
+    }
+
+    async function updateSubtaskStatus(subtaskId, isComplete) {
+        await fetch(`/projects/${projectId}/subtasks/${subtaskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_complete: isComplete })
+        });
+        // No need to re-render here as fetchAndRenderSubtasks is called after
+    }
+    
+    // --- Comment Functions ---
+    async function fetchAndRenderComments(taskId) {
+        const response = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`);
+        const comments = await response.json();
+        renderComments(comments);
+    }
+    
+    function renderComments(comments) {
+        const commentList = document.getElementById('comment-list');
+        commentList.innerHTML = ''; // Ensure list is clear before rendering
+        if (!comments) return;
+        comments.forEach(comment => {
+            const li = document.createElement('li');
+            li.className = 'comment-item';
+            li.innerHTML = `
+                <div class="comment-header">
+                    <span class="comment-author">${escapeHTML(comment.author)}</span>
+                    <span class="comment-date">${comment.created_at}</span>
+                </div>
+                <p class="comment-content">${escapeHTML(comment.content)}</p>
+            `;
+            commentList.appendChild(li);
+        });
+    }
+
+    async function addComment(event) {
+        event.preventDefault();
+        const form = event.target;
+        const content = form.querySelector('#comment-content').value;
+        if (!content.trim() || !currentTaskId) return;
+
+        const response = await fetch(`/projects/${projectId}/tasks/${currentTaskId}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content })
+        });
+
+        if (response.ok) {
+            form.reset();
+            await fetchAndRenderComments(currentTaskId);
+            await fetchTasks(); // Refresh main board to update count
+        } else {
+            alert('Failed to add comment.');
+        }
     }
 
     function escapeHTML(str) {

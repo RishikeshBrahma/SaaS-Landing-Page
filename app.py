@@ -6,18 +6,10 @@ from datetime import datetime
 import sys
 from functools import wraps
 import os
+from config import Config
 
 app = Flask(__name__)
-
-# --- This is the corrected database connection section ---
-# It uses all the environment variables from Render to connect to your Aiven database
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST')
-app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER')
-app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD')
-app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB')
-app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT'))
-
+app.config.from_object(Config)
 bcrypt = Bcrypt(app)
 
 # Database Connection Pool
@@ -30,10 +22,6 @@ try:
         user=app.config['MYSQL_USER'],
         password=app.config['MYSQL_PASSWORD'],
         database=app.config['MYSQL_DB'],
-        port=app.config['MYSQL_PORT'],
-        ssl_ca=None,
-        ssl_disabled=False,
-        ssl_verify_cert=False
     )
     print("--- Database connection pool created successfully. ---")
 except Exception as e:
@@ -43,10 +31,7 @@ def get_db_connection():
     if not db_pool:
         raise Exception("Database pool is not available.")
     return db_pool.get_connection()
-# --- End of corrections ---
 
-
-# --- ALL OF YOUR ORIGINAL FUNCTIONS ARE BELOW, UNCHANGED ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -309,6 +294,7 @@ def delete_task(project_id, task_id):
     finally:
         if connection and connection.is_connected(): connection.close()
 
+# ## FIXED: Changed date format to escape % signs for SQL ##
 @app.route('/projects/<int:project_id>/tasks/<int:task_id>/comments', methods=['GET'])
 @login_required
 @project_member_required
@@ -317,6 +303,7 @@ def get_comments(project_id, task_id):
     try:
         connection = get_db_connection()
         cur = connection.cursor(dictionary=True)
+        # The '%%' escapes the percent sign for the database query
         query = "SELECT c.id, c.content, DATE_FORMAT(c.created_at, '%%b %%d, %%Y %%H:%%i') as created_at, u.name as author FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = %s ORDER BY c.created_at ASC"
         cur.execute(query, (task_id,))
         comments = cur.fetchall()
@@ -450,5 +437,4 @@ def logout():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
-# config.py 
+    app.run(debug=True, host='0.0.0.0', port=port)

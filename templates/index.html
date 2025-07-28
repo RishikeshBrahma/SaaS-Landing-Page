@@ -3,54 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Landing Page</title>
+    <title>SaaS Project Manager - Organize Your Workflow</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <div id="branding">
-                <h1><span class="highlight">SaaS</span> Project Manager</h1>
-            </div>
-            <nav>
-                <ul>
-                    <li><a href="#" id="login-btn-nav">Login</a></li>
-                    <li><a href="#" id="signup-btn-nav">Sign Up</a></li>
-                </ul>
-            </nav>
-        </div>
+    <header class="navbar">
+        <a href="{{ url_for('index') }}" class="logo">ProjectFlow</a>
+        <nav class="nav-links">
+            <ul>
+                <li><a href="#" id="login-btn-nav">Login</a></li>
+                <li><a href="#" id="signup-btn-nav" class="btn btn-primary">Get Started</a></li>
+            </ul>
+        </nav>
     </header>
 
-    <section id="showcase">
-        <div class="container">
-            <h1>Organize Your Workflow</h1>
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Organize Your Workflow, Seamlessly</h1>
             <p>The ultimate platform for seamless team collaboration and productivity.</p>
+            <a href="#" id="get-started-btn" class="btn btn-primary">Create Your First Project</a>
         </div>
     </section>
 
-    <!-- Login Modal -->
+    <section id="features" class="container">
+        <h2 class="section-title">Everything You Need to Succeed</h2>
+        <p class="section-subtitle">A powerful suite of tools to take your projects from idea to launch.</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>Project Management</h3>
+                <p>Create and manage all your projects from a single, intuitive dashboard.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Visual Kanban Boards</h3>
+                <p>Use drag-and-drop Kanban boards to visualize your workflow and track progress.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Team Collaboration</h3>
+                <p>Invite members to your projects and assign tasks to keep everyone in sync.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Task Management</h3>
+                <p>Create, edit, and prioritize tasks with due dates and assignee details.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Real-Time Updates</h3>
+                <p>Experience a fully dynamic interface where changes are reflected instantly.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Responsive Design</h3>
+                <p>Manage your projects on the go from any device, whether desktop or mobile.</p>
+            </div>
+        </div>
+    </section>
+
     <div id="login-modal" class="modal">
         <div class="modal-content">
-            <span class="close-button">&times;</span>
+            <span class="close-btn">&times;</span>
             <h2>Login</h2>
             <form id="login-form">
-                <input type="email" id="login-email" placeholder="Email" required>
-                <input type="password" id="login-password" placeholder="Password" required>
-                <button type="submit">Login</button>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" class="btn">Login</button>
             </form>
         </div>
     </div>
 
-    <!-- Signup Modal -->
     <div id="signup-modal" class="modal">
         <div class="modal-content">
-            <span class="close-button">&times;</span>
+            <span class="close-btn">&times;</span>
             <h2>Sign Up</h2>
             <form id="signup-form">
-                <input type="text" id="signup-name" placeholder="Full Name" required>
-                <input type="email" id="signup-email" placeholder="Email" required>
-                <input type="password" id="signup-password" placeholder="Password" required>
-                <button type="submit">Create Account</button>
+                <input type="text" name="name" placeholder="Full Name" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" class="btn">Create Account</button>
             </form>
         </div>
     </div>

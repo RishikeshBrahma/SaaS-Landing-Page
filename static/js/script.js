@@ -3,8 +3,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const signupModal = document.getElementById('signup-modal');
     const loginModal = document.getElementById('login-modal');
 
-    const openSignupBtns = document.querySelectorAll('.open-signup-modal-btn');
-    const openLoginBtn = document.getElementById('open-login-modal-btn');
+    // All buttons that should open the signup modal
+    const openSignupBtns = [
+        document.getElementById('signup-btn-nav'),
+        document.getElementById('get-started-btn')
+    ];
+    // All buttons that should open the login modal
+    const openLoginBtn = document.getElementById('login-btn-nav');
     
     const closeBtns = document.querySelectorAll('.close-btn');
 
@@ -16,11 +21,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (modal) modal.style.display = 'none';
     }
 
-    openSignupBtns.forEach(btn => btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        openModal(signupModal);
-    }));
+    // Attach event listeners for all signup buttons
+    openSignupBtns.forEach(btn => {
+        if (btn) btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openModal(signupModal);
+        });
+    });
 
+    // Attach event listener for login button
     if(openLoginBtn) openLoginBtn.addEventListener('click', (e) => {
         e.preventDefault();
         openModal(loginModal);
@@ -38,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.target == loginModal) closeModal(loginModal);
     });
 
-    // --- Form Submissions ---
+    // --- Form Submissions (Confirmed to be working with fixed HTML) ---
 
     // Handle Signup
     const signupForm = document.getElementById('signup-form');
@@ -60,15 +69,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password }),
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    // Get the error message from the server response
+                    return response.json().then(err => { throw new Error(err.message) });
+                }
+                return response.json();
+            })
             .then(data => {
                 alert(data.message);
                 if (data.status === 'success') {
                     closeModal(signupModal);
                     form.reset();
+                    // Optionally open the login modal automatically
+                    openModal(loginModal); 
                 }
             })
-            .catch(error => console.error('Signup Error:', error));
+            .catch(error => {
+                console.error('Signup Error:', error);
+                alert(`Error: ${error.message}`);
+            });
         });
     }
 
@@ -94,39 +114,13 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    // UPDATED: Redirect to the URL provided by the server
+                    // Redirect to the projects page on successful login
                     window.location.href = data.redirect_url;
                 } else {
                     alert(data.message);
                 }
             })
             .catch(error => console.error('Login Error:', error));
-        });
-    }
-
-
-    // Handle Subscription
-    const subscriptionForm = document.getElementById('subscription-form');
-    if (subscriptionForm) {
-        subscriptionForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const form = e.target;
-            const email = form.querySelector('input[name="email"]').value;
-            if (!email) {
-                alert('Email is required');
-                return;
-            }
-            fetch('/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.message);
-                if (data.status === 'success') form.reset();
-            })
-            .catch(error => console.error('Subscription Error:', error));
         });
     }
 });

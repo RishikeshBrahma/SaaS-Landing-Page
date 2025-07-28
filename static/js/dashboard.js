@@ -57,11 +57,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Task Functions ---
     async function fetchTasks() {
-        const response = await fetch(`/projects/${projectId}/tasks`);
-        const data = await response.json();
-        allTasks = {};
-        Object.values(data).flat().forEach(task => { allTasks[task.id] = task; });
-        renderTasks(data);
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks`);
+            const data = await response.json();
+            
+            // Clear and rebuild allTasks object
+            allTasks = {};
+            Object.values(data).flat().forEach(task => { 
+                allTasks[task.id] = task; 
+            });
+            
+            renderTasks(data);
+        } catch (error) {
+            console.error('Error fetching tasks:', error);
+        }
     }
 
     function renderTasks(tasksByStatus) {
@@ -70,7 +79,11 @@ document.addEventListener('DOMContentLoaded', function() {
             inprogress: document.getElementById('inprogress-tasks'),
             done: document.getElementById('done-tasks')
         };
+        
+        // Clear all columns first
         Object.values(columns).forEach(col => col.innerHTML = '');
+        
+        // Render tasks in their respective columns
         for (const status in tasksByStatus) {
             if (columns[status]) {
                 tasksByStatus[status].forEach(task => {
@@ -80,125 +93,247 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ## MODIFIED: createTaskCard now shows subtask and comment counts ##
+    // ENHANCED: Task card now shows actual subtasks and comments with authors
     function createTaskCard(task) {
         const card = document.createElement('div');
         card.className = 'task-card';
         card.dataset.taskId = task.id;
 
-        // Calculate counts
-        const subtaskCount = task.subtasks ? task.subtasks.length : 0;
+        // Build subtasks section
+        let subtasksHTML = '';
+        if (task.subtasks && task.subtasks.length > 0) {
+            subtasksHTML = `
+                <div class="card-subtasks">
+                    <div class="card-section-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 12l2 2 4-4"/>
+                            <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                        </svg>
+                        Subtasks (${task.subtasks.filter(st => st.is_complete).length}/${task.subtasks.length})
+                    </div>
+                    <div class="card-subtask-list">
+                        ${task.subtasks.slice(0, 3).map(subtask => `
+                            <div class="card-subtask-item ${subtask.is_complete ? 'completed' : ''}">
+                                <span class="subtask-checkbox">${subtask.is_complete ? '✓' : '○'}</span>
+                                <span class="subtask-text">${escapeHTML(subtask.content)}</span>
+                                <span class="subtask-author">by ${escapeHTML(subtask.created_by || 'Unknown')}</span>
+                            </div>
+                        `).join('')}
+                        ${task.subtasks.length > 3 ? `<div class="card-more">+${task.subtasks.length - 3} more...</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Build comments section (we'll need to fetch comments separately for author info)
+        let commentsHTML = '';
         const commentCount = task.comment_count || 0;
+        if (commentCount > 0) {
+            commentsHTML = `
+                <div class="card-comments">
+                    <div class="card-section-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Comments (${commentCount})
+                    </div>
+                    <div class="card-comment-preview" data-task-id="${task.id}">
+                        Loading comments...
+                    </div>
+                </div>
+            `;
+        }
 
         card.innerHTML = `
-            <p>${escapeHTML(task.content)}</p>
+            <div class="task-content">
+                <p class="task-title">${escapeHTML(task.content)}</p>
+            </div>
+            
+            ${subtasksHTML}
+            ${commentsHTML}
+            
             <div class="task-card-footer">
                 <span class="priority ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
-                <div class="task-meta">
-                    <span class="task-meta-item">
-                        <svg_icon_for_subtask> ${subtaskCount}
-                    </span>
-                    <span class="task-meta-item">
-                        <svg_icon_for_comment> ${commentCount}
-                    </span>
-                    <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
-                </div>
+                <span class="assignee">${escapeHTML(task.assignee_name) || 'Unassigned'}</span>
             </div>`;
+        
+        // Load comments for this card if they exist
+        if (commentCount > 0) {
+            loadCardComments(task.id);
+        }
+        
         card.addEventListener('click', () => openTaskDetails(task.id));
         return card;
     }
 
+    // NEW: Function to load comments for display on cards
+    async function loadCardComments(taskId) {
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`);
+            if (response.ok) {
+                const comments = await response.json();
+                const previewElement = document.querySelector(`[data-task-id="${taskId}"] .card-comment-preview`);
+                
+                if (previewElement && comments.length > 0) {
+                    const recentComments = comments.slice(-2); // Show last 2 comments
+                    previewElement.innerHTML = recentComments.map(comment => `
+                        <div class="card-comment-item">
+                            <span class="comment-author">${escapeHTML(comment.author)}:</span>
+                            <span class="comment-text">${escapeHTML(comment.content.substring(0, 50))}${comment.content.length > 50 ? '...' : ''}</span>
+                        </div>
+                    `).join('') + (comments.length > 2 ? `<div class="card-more">+${comments.length - 2} more...</div>` : '');
+                }
+            }
+        } catch (error) {
+            console.error('Error loading card comments:', error);
+        }
+    }
 
     async function addTask(event) {
         event.preventDefault();
         const form = event.target;
-        // Logic to add task...
-        await fetch(`/projects/${projectId}/tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                content: form.querySelector('#task-content').value,
-                priority: form.querySelector('#task-priority').value,
-                due_date: form.querySelector('#task-due-date').value || null,
-                assignee_id: form.querySelector('#task-assignee').value || null
-            })
-        });
-        form.closest('.modal').style.display = 'none';
-        form.reset();
-        await fetchTasks();
+        
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: form.querySelector('#task-content').value,
+                    priority: form.querySelector('#task-priority').value,
+                    due_date: form.querySelector('#task-due-date').value || null,
+                    assignee_id: form.querySelector('#task-assignee').value || null
+                })
+            });
+            
+            if (response.ok) {
+                form.closest('.modal').style.display = 'none';
+                form.reset();
+                await fetchTasks();
+            }
+        } catch (error) {
+            console.error('Error adding task:', error);
+        }
     }
     
-    // ## FIXED: Clears old data before opening a new task to prevent duplication ##
+    // CRITICAL FIX: Completely clear modal data and fetch fresh data for the specific task
     async function openTaskDetails(taskId) {
         currentTaskId = taskId;
         const task = allTasks[taskId];
         if (!task) return;
 
-        // **CRITICAL FIX**: Clear previous task's data first
+        // **STEP 1: Clear ALL previous data first**
+        clearTaskModal();
+
+        // **STEP 2: Populate form with current task data**
+        populateTaskForm(task);
+
+        // **STEP 3: Fetch and render ONLY this task's subtasks and comments**
+        await Promise.all([
+            fetchAndRenderSubtasks(taskId),
+            fetchAndRenderComments(taskId)
+        ]);
+        
+        showModal('task-details-modal');
+    }
+
+    // NEW: Function to completely clear modal data
+    function clearTaskModal() {
+        // Clear lists
         document.getElementById('subtask-list').innerHTML = '';
         document.getElementById('comment-list').innerHTML = '';
+        
+        // Reset forms
         document.getElementById('add-subtask-form').reset();
         document.getElementById('add-comment-form').reset();
+        
+        // Clear any existing event listeners by cloning nodes
+        const subtaskList = document.getElementById('subtask-list');
+        const newSubtaskList = subtaskList.cloneNode(true);
+        subtaskList.parentNode.replaceChild(newSubtaskList, subtaskList);
+    }
 
-        const modal = document.getElementById('task-details-modal');
+    // NEW: Function to populate task form
+    function populateTaskForm(task) {
         const form = document.getElementById('edit-task-form');
         form.querySelector('#edit-task-id').value = task.id;
         form.querySelector('#edit-task-content').value = task.content;
         form.querySelector('#edit-task-priority').value = task.priority || 'medium';
         form.querySelector('#edit-task-due-date').value = task.due_date ? task.due_date.split(' ')[0] : '';
         form.querySelector('#edit-task-assignee').value = task.assignee_id || '';
-        document.getElementById('delete-task-btn').onclick = () => deleteTask(task.id);
-
-        // Fetch and render fresh data
-        await fetchAndRenderSubtasks(taskId);
-        await fetchAndRenderComments(taskId);
         
-        showModal('task-details-modal');
+        // Set delete button handler
+        document.getElementById('delete-task-btn').onclick = () => deleteTask(task.id);
     }
 
     async function saveTaskDetails(event) {
         event.preventDefault();
         const form = event.target;
         const taskId = form.querySelector('#edit-task-id').value;
-        await fetch(`/projects/${projectId}/tasks/${taskId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                content: form.querySelector('#edit-task-content').value,
-                priority: form.querySelector('#edit-task-priority').value,
-                due_date: form.querySelector('#edit-task-due-date').value || null,
-                assignee_id: form.querySelector('#edit-task-assignee').value || null
-            })
-        });
-        form.closest('.modal').style.display = 'none';
-        await fetchTasks(); // Refresh tasks to show updated content
+        
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: form.querySelector('#edit-task-content').value,
+                    priority: form.querySelector('#edit-task-priority').value,
+                    due_date: form.querySelector('#edit-task-due-date').value || null,
+                    assignee_id: form.querySelector('#edit-task-assignee').value || null
+                })
+            });
+            
+            if (response.ok) {
+                form.closest('.modal').style.display = 'none';
+                await fetchTasks(); // Refresh tasks to show updated content
+            }
+        } catch (error) {
+            console.error('Error saving task:', error);
+        }
     }
 
     async function updateTaskStatus(taskId, newStatus) {
-        await fetch(`/projects/${projectId}/tasks/${taskId}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
-        });
-        // Update local task object and re-render
-        if(allTasks[taskId]) {
-            allTasks[taskId].status = newStatus;
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks/${taskId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            
+            if (response.ok && allTasks[taskId]) {
+                allTasks[taskId].status = newStatus;
+            }
+        } catch (error) {
+            console.error('Error updating task status:', error);
         }
     }
 
     async function deleteTask(taskId) {
         if (!confirm('Are you sure you want to delete this task?')) return;
-        await fetch(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
-        document.getElementById('task-details-modal').style.display = 'none';
-        await fetchTasks(); 
+        
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks/${taskId}`, { 
+                method: 'DELETE' 
+            });
+            
+            if (response.ok) {
+                document.getElementById('task-details-modal').style.display = 'none';
+                await fetchTasks(); 
+            }
+        } catch (error) {
+            console.error('Error deleting task:', error);
+        }
     }
 
     // --- Member Functions ---
     async function fetchMembers() {
-        const response = await fetch(`/projects/${projectId}/members`);
-        members = await response.json();
-        populateAssigneeDropdowns();
-        renderMembers();
+        try {
+            const response = await fetch(`/projects/${projectId}/members`);
+            members = await response.json();
+            populateAssigneeDropdowns();
+            renderMembers();
+        } catch (error) {
+            console.error('Error fetching members:', error);
+        }
     }
 
     function renderMembers() {
@@ -216,17 +351,23 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault();
         const form = event.target;
         const email = form.querySelector('#member-email').value;
-        const response = await fetch(`/projects/${projectId}/members`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-        });
-        const data = await response.json();
-        if (response.ok) {
-            form.reset();
-            await fetchMembers();
-        } else {
-            alert(`Error: ${data.error}`);
+        
+        try {
+            const response = await fetch(`/projects/${projectId}/members`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                form.reset();
+                await fetchMembers();
+            } else {
+                alert(`Error: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error adding member:', error);
         }
     }
     
@@ -245,20 +386,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Subtask Functions ---
+    // --- FIXED Subtask Functions ---
     async function fetchAndRenderSubtasks(taskId) {
-        const response = await fetch(`/projects/${projectId}/tasks`); // Re-fetch all tasks to get latest subtasks
-        const data = await response.json();
-        allTasks = {};
-        Object.values(data).flat().forEach(task => { allTasks[task.id] = task; });
-        const task = allTasks[taskId];
-        renderSubtasks(task.subtasks || []);
+        try {
+            // Get the specific task's subtasks from our stored data
+            const task = allTasks[taskId];
+            if (task && task.subtasks) {
+                renderSubtasks(task.subtasks);
+            } else {
+                // If no subtasks in memory, fetch fresh data
+                await fetchTasks();
+                const updatedTask = allTasks[taskId];
+                if (updatedTask && updatedTask.subtasks) {
+                    renderSubtasks(updatedTask.subtasks);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching subtasks:', error);
+        }
     }
 
     function renderSubtasks(subtasks) {
         const subtaskList = document.getElementById('subtask-list');
-        subtaskList.innerHTML = ''; // Ensure list is clear before rendering
-        if (!subtasks) return;
+        subtaskList.innerHTML = ''; // Clear list
+        
+        if (!subtasks || !Array.isArray(subtasks)) return;
+        
         subtasks.forEach(subtask => {
             const li = document.createElement('li');
             li.className = `subtask-item ${subtask.is_complete ? 'completed' : ''}`;
@@ -266,9 +419,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="checkbox" data-subtask-id="${subtask.id}" ${subtask.is_complete ? 'checked' : ''}>
                 <span>${escapeHTML(subtask.content)}</span>
             `;
-            li.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+            
+            // Add event listener for this specific checkbox
+            const checkbox = li.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener('change', (e) => {
                 updateSubtaskStatus(subtask.id, e.target.checked);
             });
+            
             subtaskList.appendChild(li);
         });
     }
@@ -276,44 +433,77 @@ document.addEventListener('DOMContentLoaded', function() {
     async function addSubtask(event) {
         event.preventDefault();
         const form = event.target;
-        const content = form.querySelector('#subtask-content').value;
-        if (!content.trim() || !currentTaskId) return;
+        const content = form.querySelector('#subtask-content').value.trim();
+        
+        if (!content || !currentTaskId) return;
 
-        const response = await fetch(`/projects/${projectId}/subtasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: content, task_id: currentTaskId })
-        });
+        try {
+            const response = await fetch(`/projects/${projectId}/subtasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    content: content, 
+                    task_id: currentTaskId 
+                })
+            });
 
-        if (response.ok) {
-            form.reset();
-            await fetchAndRenderSubtasks(currentTaskId);
-            await fetchTasks(); // Refresh main board to update count
-        } else {
-            alert('Failed to add subtask.');
+            if (response.ok) {
+                form.reset();
+                // Refresh the main tasks data first, then update subtasks display
+                await fetchTasks();
+                await fetchAndRenderSubtasks(currentTaskId);
+            } else {
+                alert('Failed to add subtask.');
+            }
+        } catch (error) {
+            console.error('Error adding subtask:', error);
         }
     }
 
     async function updateSubtaskStatus(subtaskId, isComplete) {
-        await fetch(`/projects/${projectId}/subtasks/${subtaskId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_complete: isComplete })
-        });
-        // No need to re-render here as fetchAndRenderSubtasks is called after
+        try {
+            const response = await fetch(`/projects/${projectId}/subtasks/${subtaskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_complete: isComplete })
+            });
+            
+            if (response.ok) {
+                // Update the local data
+                const task = allTasks[currentTaskId];
+                if (task && task.subtasks) {
+                    const subtask = task.subtasks.find(st => st.id === subtaskId);
+                    if (subtask) {
+                        subtask.is_complete = isComplete;
+                    }
+                }
+                // Refresh main board to update counts
+                await fetchTasks();
+            }
+        } catch (error) {
+            console.error('Error updating subtask:', error);
+        }
     }
     
-    // --- Comment Functions ---
+    // --- FIXED Comment Functions ---
     async function fetchAndRenderComments(taskId) {
-        const response = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`);
-        const comments = await response.json();
-        renderComments(comments);
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`);
+            if (response.ok) {
+                const comments = await response.json();
+                renderComments(comments);
+            }
+        } catch (error) {
+            console.error('Error fetching comments:', error);
+        }
     }
     
     function renderComments(comments) {
         const commentList = document.getElementById('comment-list');
-        commentList.innerHTML = ''; // Ensure list is clear before rendering
-        if (!comments) return;
+        commentList.innerHTML = ''; // Clear list
+        
+        if (!comments || !Array.isArray(comments)) return;
+        
         comments.forEach(comment => {
             const li = document.createElement('li');
             li.className = 'comment-item';
@@ -331,28 +521,36 @@ document.addEventListener('DOMContentLoaded', function() {
     async function addComment(event) {
         event.preventDefault();
         const form = event.target;
-        const content = form.querySelector('#comment-content').value;
-        if (!content.trim() || !currentTaskId) return;
+        const content = form.querySelector('#comment-content').value.trim();
+        
+        if (!content || !currentTaskId) return;
 
-        const response = await fetch(`/projects/${projectId}/tasks/${currentTaskId}/comments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: content })
-        });
+        try {
+            const response = await fetch(`/projects/${projectId}/tasks/${currentTaskId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            });
 
-        if (response.ok) {
-            form.reset();
-            await fetchAndRenderComments(currentTaskId);
-            await fetchTasks(); // Refresh main board to update count
-        } else {
-            alert('Failed to add comment.');
+            if (response.ok) {
+                form.reset();
+                // Refresh both comments and main board
+                await Promise.all([
+                    fetchAndRenderComments(currentTaskId),
+                    fetchTasks() // This updates comment counts on cards
+                ]);
+            } else {
+                alert('Failed to add comment.');
+            }
+        } catch (error) {
+            console.error('Error adding comment:', error);
         }
     }
 
     function escapeHTML(str) {
         if (str === null || str === undefined) return '';
-        const p = document.createElement('p');
-        p.textContent = str;
-        return p.innerHTML;
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 });
